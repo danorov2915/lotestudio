@@ -1,0 +1,4928 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a192f">
+  <meta name="description" content="Medidor Topográfico y Generador de Croquis Arquitectónico con GPS de Alta Precisión, Cotas Técnicas, Rumbos, Cuadro de Construcción y Exportación DXF/PDF.">
+  <title>Topógrafo Pro GPS & Croquis Arquitectónico</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Leaflet para Vista Satelital HD Real -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Three.js + OrbitControls para Visor CAD 3D de Malla Alámbrica / TIN Triangulado -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    :root {
+      --bg-main: #070e17;
+      --bg-card: #0f1c2e;
+      --bg-card-sub: #16263b;
+      --border-color: #1e3a5f;
+      --border-accent: #00e5ff;
+      --cyan: #00e5ff;
+      --cyan-glow: rgba(0, 229, 255, 0.25);
+      --blueprint-blue: #0b3c68;
+      --gold: #ffb703;
+      --green: #10b981;
+      --red: #ef4444;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --font-ui: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      padding-bottom: 90px;
+    }
+
+    /* HEADER PROFESIONAL */
+    header {
+      background: linear-gradient(180deg, #0d1b2a 0%, #070e17 100%);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 150;
+      backdrop-filter: blur(10px);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0052cc 0%, #00e5ff 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    .brand-icon svg {
+      width: 24px;
+      height: 24px;
+      fill: #fff;
+    }
+
+    .brand-title h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #ffffff, var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-title p {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn-chip {
+      background: var(--bg-card-sub);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-chip:hover, .btn-chip.active {
+      border-color: var(--cyan);
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--cyan);
+    }
+
+    /* CONTENEDOR PRINCIPAL */
+    .container {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 14px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* STATUS DEL GPS & ACCURACY HUD */
+    .gps-telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+    }
+
+    .telemetry-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+
+    .telemetry-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3px;
+      height: 100%;
+      background: var(--cyan);
+    }
+
+    .telemetry-card.gold::before { background: var(--gold); }
+    .telemetry-card.green::before { background: var(--green); }
+    .telemetry-card.accent::before { background: #8b5cf6; }
+
+    .telemetry-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .telemetry-value {
+      font-family: var(--font-mono);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .telemetry-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .badge-accuracy {
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-good { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
+    .badge-mid { background: rgba(255, 183, 3, 0.2); color: #ffb703; border: 1px solid #ffb703; }
+    .badge-bad { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; }
+
+    /* LAYOUT PRINCIPAL: PLANO ARQUITECTÓNICO + HERRAMIENTAS */
+    .blueprint-workspace {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    @media (max-width: 980px) {
+      .blueprint-workspace {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* CANVAS DEL PLANO ARQUITECTÓNICO */
+    .cad-canvas-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    .canvas-toolbar {
+      background: #0b1522;
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .tool-btn {
+      background: var(--bg-card-sub);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      font-weight: 500;
+    }
+
+    .tool-btn:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(0, 229, 255, 0.08);
+    }
+
+    .tool-btn.active {
+      background: var(--cyan);
+      color: #000;
+      border-color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      height: 520px;
+      background: #020813;
+      cursor: crosshair;
+      user-select: none;
+      touch-action: none;
+    }
+
+    canvas#planCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* OVERLAYS DENTRO DEL CANVAS */
+    .canvas-hud-overlay {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(7, 14, 23, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      pointer-events: none;
+      font-family: var(--font-mono);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .canvas-hud-overlay span {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .canvas-hud-overlay b {
+      color: var(--cyan);
+    }
+
+    .canvas-floating-controls {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    .float-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(15, 28, 46, 0.9);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-color);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: all 0.15s ease;
+    }
+
+    .float-btn:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      transform: scale(1.05);
+    }
+
+    .canvas-hint {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(11, 21, 34, 0.85);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* PANELES LATERALES / TABS */
+    .sidebar-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      background: #091320;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 6px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      color: var(--cyan);
+      border-bottom-color: var(--cyan);
+      background: rgba(0, 229, 255, 0.05);
+    }
+
+    .tab-content {
+      padding: 14px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 520px;
+      overflow-y: auto;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    /* MEMBRETE ARQUITECTÓNICO FORM */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-group label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .form-control {
+      background: var(--bg-card-sub);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: #fff;
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      transition: border-color 0.2s ease;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--cyan);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    /* TABLA DE VÉRTICES Y CUADRO DE CONSTRUCCIÓN */
+    .table-container {
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: #091422;
+    }
+
+    table.topography-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      text-align: left;
+    }
+
+    table.topography-table th {
+      background: #0f2035;
+      padding: 8px 6px;
+      color: var(--cyan);
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    table.topography-table td {
+      padding: 6px;
+      border-bottom: 1px solid rgba(30, 58, 95, 0.4);
+      white-space: nowrap;
+      color: #e2e8f0;
+    }
+
+    table.topography-table tr:hover {
+      background: rgba(0, 229, 255, 0.05);
+    }
+
+    .badge-pt {
+      display: inline-block;
+      background: var(--cyan);
+      color: #000;
+      font-weight: bold;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.68rem;
+    }
+
+    /* CALCULADORA DE VALUACIÓN & CERCO */
+    .calc-card {
+      background: rgba(0, 229, 255, 0.03);
+      border: 1px dashed var(--border-color);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .calc-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+    }
+
+    .calc-val {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    /* BARRA DE BOTONES DE CAMPO FLOTANTE INFERIOR */
+    .field-action-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(11, 21, 35, 0.94);
+      backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border-color);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: center;
+      z-index: 100;
+      box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
+    }
+
+    .action-bar-inner {
+      max-width: 900px;
+      width: 100%;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn-main-capture {
+      flex: 2;
+      background: linear-gradient(135deg, #0284c7 0%, #00e5ff 100%);
+      color: #031326;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 18px var(--cyan-glow);
+      transition: all 0.2s ease;
+      letter-spacing: -0.01em;
+    }
+
+    .btn-main-capture:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 22px rgba(0, 229, 255, 0.45);
+    }
+
+    .btn-main-capture:active {
+      transform: translateY(1px);
+    }
+
+    .btn-action-sec {
+      flex: 1;
+      background: var(--bg-card-sub);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px 10px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-action-sec:hover {
+      border-color: var(--cyan);
+      background: rgba(0, 229, 255, 0.08);
+    }
+
+    .btn-action-sec.danger:hover {
+      border-color: var(--red);
+      background: rgba(239, 68, 68, 0.12);
+      color: #fca5a5;
+    }
+
+    /* MODAL DE EXPORTACIÓN & CONFIG */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 12, 0.85);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #0f1f33;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      max-width: 600px;
+      width: 100%;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .modal-header h3 {
+      font-size: 1.15rem;
+      color: #fff;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .export-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .export-btn {
+      background: #15263d;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+    }
+
+    .export-btn:hover {
+      border-color: var(--cyan);
+      background: rgba(0, 229, 255, 0.08);
+      transform: translateY(-2px);
+    }
+
+    .export-btn b {
+      color: var(--cyan);
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .export-btn span {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    /* ESTILOS PARA IMPRESIÓN Y PDF ARQUITECTÓNICO */
+    @media print {
+      body {
+        background: #fff !important;
+        color: #000 !important;
+        padding: 0 !important;
+      }
+
+      header, .field-action-bar, .canvas-toolbar, .canvas-floating-controls, .canvas-hint, .sidebar-card, .btn-chip, .modal-backdrop {
+        display: none !important;
+      }
+
+      .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+      }
+
+      .cad-canvas-card {
+        border: none !important;
+        box-shadow: none !important;
+        background: #fff !important;
+      }
+
+      .canvas-container {
+        height: 650px !important;
+        background: #fff !important;
+      }
+    }
+  </style>
+  <!-- PWA KIT OFICIAL -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LoteStudio">
+  <link rel="apple-touch-icon" href="LoteStudio.png">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</head>
+<body>
+
+  <!-- HEADER PROFESIONAL -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L2 7l10 5 10-5-10-5zm0 9l-7.5-3.75L12 3.5l7.5 3.75L12 11zm-8 4.25L12 19l8-3.75V19l-8 4-8-4v-3.75z"/>
+        </svg>
+      </div>
+      <div class="brand-title">
+        <h1>Topógrafo Pro GPS</h1>
+        <p>Croquis & Planos Arquitectónicos</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Selector de Vista Rápida 3D / Satelital -->
+      <button class="btn-chip" onclick="cambiarModoVistaPrincipal('3d')" title="Abrir Visor 3D CAD con rotación libre en los 3 ejes">
+        🧊 Visor 3D (TIN)
+      </button>
+      <button class="btn-chip" onclick="cambiarModoVistaPrincipal('satelital')" title="Ver polígono sobre mapa satelital HD">
+        🛰️ Satelital HD
+      </button>
+
+      <!-- Asistente de Medición con Cinta Métrica y Diagonales -->
+      <button class="btn-chip" onclick="abrirModalCintaMetrica()" title="Calcular escuadra y medir con cinta bajo el sol">
+        📏 Medir con Cinta
+      </button>
+
+      <!-- Selector de Ejemplos para Probar al Instante -->
+      <button class="btn-chip" onclick="abrirModalEjemplos()" title="Probar con plantillas de terrenos">
+        📐 Plantillas Demo
+      </button>
+
+      <!-- Gestor de Proyectos y Guardado -->
+      <button class="btn-chip" style="background:rgba(16,185,129,0.15); border-color:var(--green); color:var(--green);" onclick="abrirModalGuardarLote()" title="Guardar este terreno en la memoria del dispositivo">
+        💾 Guardar Lote
+      </button>
+      <button class="btn-chip" onclick="abrirModalMisLotes()" title="Abrir y cargar terrenos guardados">
+        📁 Mis Terrenos (<span id="badgeNumLotes">0</span>)
+      </button>
+
+      <!-- Botón Manual de Usuario en PDF -->
+      <a href="Manual_Usuario_Topografo.html" target="_blank" class="btn-chip" style="text-decoration:none; background:rgba(2,132,199,0.15); border-color:var(--cyan); color:var(--cyan);" title="Abrir y descargar el Manual de Usuario en PDF">
+        📖 Manual PDF
+      </a>
+
+      <!-- Botón Exportar / Imprimir -->
+      <button class="btn-chip" onclick="abrirModalExportar()" title="Exportar plano en PDF, Imagen HD, DXF, KML o Informe Completo">
+        📥 Exportar
+      </button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- TELEMETRÍA Y STATUS GPS -->
+    <div class="gps-telemetry-grid">
+      <div class="telemetry-card">
+        <div class="telemetry-label">
+          <span>Estado GPS</span>
+          <span id="gpsDot" style="width:8px; height:8px; border-radius:50%; background:#94a3b8; display:inline-block;"></span>
+        </div>
+        <div class="telemetry-value" id="gpsState" style="font-size: 1rem; color: var(--cyan);">Buscando Satélites...</div>
+        <div class="telemetry-sub" id="gpsCoords">Lat: -- | Lon: --</div>
+      </div>
+
+      <div class="telemetry-card gold">
+        <div class="telemetry-label">
+          <span>Precisión de Señal</span>
+          <span id="accuracyBadge" class="badge-accuracy badge-mid">Esperando</span>
+        </div>
+        <div class="telemetry-value" id="accuracyVal">± -- m</div>
+        <div class="telemetry-sub" id="accuracyConsejo">Ideal en campo: &lt; 4.0 m</div>
+      </div>
+
+      <div class="telemetry-card green">
+        <div class="telemetry-label">
+          <span>Superficie Total</span>
+          <span style="color:var(--green); font-size:0.7rem; font-weight:700;">ÁREA</span>
+        </div>
+        <div class="telemetry-value" id="areaDisplay">0.00 <span style="font-size:0.8rem; font-weight:400;">m²</span></div>
+        <div class="telemetry-sub" id="areaHaDisplay">0.0000 Hectáreas</div>
+      </div>
+
+      <div class="telemetry-card accent">
+        <div class="telemetry-label">
+          <span>Perímetro</span>
+          <span style="color:#c084fc; font-size:0.7rem; font-weight:700;">LÍMITE</span>
+        </div>
+        <div class="telemetry-value" id="perimeterDisplay">0.00 <span style="font-size:0.8rem; font-weight:400;">m</span></div>
+        <div class="telemetry-sub" id="sidesDisplay">0 vértices registrados</div>
+      </div>
+    </div>
+
+    <!-- WORKSPACE PRINCIPAL: PLANO CAD + PANEL DE CONTROL -->
+    <div class="blueprint-workspace">
+
+      <!-- PLANO ARQUITECTÓNICO / CANVAS -->
+      <div class="cad-canvas-card">
+        <div class="canvas-toolbar">
+          <div class="toolbar-left">
+            <span style="font-size:0.78rem; font-weight:700; color:var(--text-muted); margin-right:4px;">VISTA:</span>
+            <button class="tool-btn active" id="btnView2D" onclick="cambiarModoVistaPrincipal('2d')">📐 Plano 2D</button>
+            <button class="tool-btn" id="btnViewSat" onclick="cambiarModoVistaPrincipal('satelital')">🛰️ Vista Satelital HD</button>
+            <button class="tool-btn" id="btnView3D" onclick="cambiarModoVistaPrincipal('3d')">🧊 Visor 3D CAD (TIN Mesh)</button>
+          </div>
+
+          <div class="toolbar-right">
+            <span style="font-size:0.72rem; color:var(--text-muted); margin-right:2px;">ESTILO (2D / 3D):</span>
+            <button class="tool-btn active" id="btnThemeBlueprint" onclick="setCanvasTheme('blueprint')">📘 Blueprint</button>
+            <button class="tool-btn" id="btnThemeDarkCAD" onclick="setCanvasTheme('darkcad')">🖤 Dark CAD</button>
+            <button class="tool-btn" id="btnThemeWhite" onclick="setCanvasTheme('white')">📄 Papel Blanco</button>
+            <button class="tool-btn" id="btnToggleCotas" onclick="toggleLayer('cotas')" title="Mostrar u ocultar medidas exteriores">📏 Cotas [ON]</button>
+            <button class="tool-btn" id="btnToggleAngulos" onclick="toggleLayer('angulos')" title="Mostrar u ocultar ángulos de esquinas">📐 Ángulos [ON]</button>
+            <button class="tool-btn active" id="btnToggleCuadricula" onclick="toggleLayer('grid')" title="Mostrar u ocultar cuadrícula milimétrica">▦ Malla [ON]</button>
+            <button class="tool-btn active" id="btnToggleAltimetria" onclick="toggleLayer('altimetria')" title="Mostrar u ocultar niveles, pendiente y montículo">⛰️ Relieve [ON]</button>
+            <button class="tool-btn" id="btnModoDibujo" onclick="toggleModoDibujo()" title="Hacer clic en pantalla para agregar vértices manualmente">✏️ Modo Manual</button>
+          </div>
+        </div>
+
+        <div class="canvas-container" id="canvasWrapper">
+          <!-- Canvas 2D Arquitectónico -->
+          <canvas id="planCanvas"></canvas>
+
+          <!-- Contenedor Mapa Satelital HD Leaflet -->
+          <div id="satelliteMapContainer" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; z-index:5;"></div>
+
+          <!-- Contenedor Visor 3D Three.js CAD Mesh -->
+          <div id="cad3DContainer" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; z-index:5; background:#070f1a;">
+            <!-- HUD de controles 3D -->
+            <div style="position:absolute; top:12px; right:12px; z-index:20; background:rgba(11,21,34,0.85); backdrop-filter:blur(8px); border:1px solid var(--border-color); border-radius:10px; padding:10px 14px; font-size:0.75rem; color:#fff; display:flex; flex-direction:column; gap:8px;">
+              <div style="font-weight:700; color:var(--cyan); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <span>🧊 Visor 3D TIN CAD (3 Ejes)</span>
+                <span style="font-size:0.65rem; background:rgba(0,229,255,0.2); color:var(--cyan); padding:2px 6px; border-radius:4px;">Rotación 360°</span>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <span>Exageración Relieve Z:</span>
+                <input type="range" id="sliderExag3D" min="1" max="15" value="4" style="width:90px; cursor:pointer;" oninput="actualizarExageracion3D(this.value)">
+                <b id="valExag3D" style="color:var(--gold); font-family:var(--font-mono); width:28px; text-align:right;">4x</b>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button class="tool-btn active" id="btn3DCotas" style="flex:1; justify-content:center; font-size:0.7rem;" onclick="toggleCotas3D()">📏 Cotas 3D [ON]</button>
+                <button class="tool-btn active" id="btn3DNiveles" style="flex:1; justify-content:center; font-size:0.7rem;" onclick="toggleNiveles3D()">⌖ Niveles Z [ON]</button>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button class="tool-btn active" style="flex:1; justify-content:center;" onclick="reiniciarCamara3D('isometrica')">📐 Isométrica</button>
+                <button class="tool-btn" style="flex:1; justify-content:center;" onclick="reiniciarCamara3D('planta')">🔝 Planta (Z)</button>
+                <button class="tool-btn" style="flex:1; justify-content:center;" onclick="reiniciarCamara3D('perfil')">↔️ Perfil (X-Y)</button>
+              </div>
+              <div style="font-size:0.68rem; color:var(--text-muted);">
+                🖱️ <i>Arrastra para rotar X, Y, Z | Rueda/Pellizco para Zoom | Clic derecho para desplazar</i>
+              </div>
+            </div>
+          </div>
+
+          <!-- HUD informativo flotante dentro del plano -->
+          <div class="canvas-hud-overlay" id="canvasHudOverlay">
+            <span>Escala Gráfica: <b id="hudEscala">1 : 150</b></span>
+            <span>Rumbo Norte: <b id="hudNorte">0° Geográfico</b></span>
+            <span>Forma: <b id="hudGeometria">Polígono Abierto</b></span>
+          </div>
+
+          <!-- Controles de Zoom y Ajuste Flotantes -->
+          <div class="canvas-floating-controls">
+            <button class="float-btn" onclick="zoomIn()" title="Acercar (+)">＋</button>
+            <button class="float-btn" onclick="zoomOut()" title="Alejar (-)">－</button>
+            <button class="float-btn" onclick="centrarPlano()" title="Centrar y Ajustar">⛶</button>
+          </div>
+
+          <div class="canvas-hint" id="canvasHint">
+            <span>💡 Consejo: Arrastra para mover el plano, o activa <b>✏️ Modo Manual</b> para marcar vértices con un toque.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL LATERAL CON TABS -->
+      <div class="sidebar-card">
+        <div class="sidebar-tabs" style="overflow-x: auto; white-space: nowrap;">
+          <button class="tab-btn active" onclick="cambiarTab('tab-construccion', this)">Cuadro Técnico</button>
+          <button class="tab-btn" onclick="cambiarTab('tab-colindancias', this)">📋 Colindancias</button>
+          <button class="tab-btn" onclick="cambiarTab('tab-subdivision', this)">🔲 Subdivisión</button>
+          <button class="tab-btn" onclick="cambiarTab('tab-fotos', this)">📸 Fotos Campo</button>
+          <button class="tab-btn" onclick="cambiarTab('tab-altimetria', this)">⛰️ Bulldozer</button>
+          <button class="tab-btn" onclick="cambiarTab('tab-membrete', this)">Membrete</button>
+          <button class="tab-btn" onclick="cambiarTab('tab-calculos', this)">Presupuesto</button>
+        </div>
+
+        <!-- TAB 1: CUADRO DE CONSTRUCCIÓN TOPOGRÁFICO -->
+        <div class="tab-content active" id="tab-construccion">
+          <div style="font-size:0.75rem; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+            <span>Memoria de Tramos & Vértices</span>
+            <span id="tabCountPts" style="font-weight:700; color:var(--cyan);">0 Vértices</span>
+          </div>
+
+          <div class="table-container">
+            <table class="topography-table">
+              <thead>
+                <tr>
+                  <th>Vértice</th>
+                  <th>Tramo</th>
+                  <th>Distancia</th>
+                  <th>Rumbo</th>
+                  <th>Ángulo</th>
+                </tr>
+              </thead>
+              <tbody id="tablaConstruccionBody">
+                <tr>
+                  <td colspan="5" style="text-align:center; padding:18px; color:var(--text-muted);">
+                    Sin vértices registrados.<br>Usa el botón GPS abajo o carga una plantilla demo.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex; gap:6px; margin-top:4px;">
+            <button class="tool-btn" style="flex:1; justify-content:center;" onclick="abrirModalManualCoord()">➕ Agregar Coordenada</button>
+            <button class="tool-btn" style="flex:1; justify-content:center; color:var(--gold);" onclick="invertirSentidoPoligono()">🔄 Invertir Giro</button>
+          </div>
+        </div>
+
+        <!-- TAB: COLINDANCIAS & MEMORIA DESCRIPTIVA NOTARIAL -->
+        <div class="tab-content" id="tab-colindancias">
+          <div style="font-size:0.75rem; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+            <span>Colindantes por Lindero</span>
+            <span style="color:var(--green); font-weight:700;">Para Notaría / Escritura</span>
+          </div>
+
+          <div id="colindanciasListaContainer" style="display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto;">
+            <!-- Generado dinámicamente -->
+          </div>
+
+          <div class="calc-card" style="background: rgba(0, 229, 255, 0.04);">
+            <div style="font-weight:700; font-size:0.8rem; color:var(--cyan); display:flex; justify-content:space-between; align-items:center;">
+              <span>📜 Memoria Descriptiva Notarial</span>
+              <button class="tool-btn" style="padding:2px 8px; font-size:0.7rem;" onclick="copiarMemoriaDescriptiva()">📋 Copiar Texto</button>
+            </div>
+            <textarea class="form-control" id="txtMemoriaDescriptiva" rows="4" style="font-size:0.72rem; font-family:var(--font-mono); resize:vertical;" readonly placeholder="Agrega al menos 3 vértices para generar la redacción legal de colindancias..."></textarea>
+          </div>
+        </div>
+
+        <!-- TAB: SUBDIVISIÓN DE LOTES -->
+        <div class="tab-content" id="tab-subdivision">
+          <div style="font-size:0.75rem; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+            <span>Partición y Fraccionamiento</span>
+            <label style="font-size:0.7rem; color:#fff; display:flex; align-items:center; gap:4px; cursor:pointer;">
+              <input type="checkbox" id="chkActivarSubdivision" onchange="actualizarCalculos()"> Activar División
+            </label>
+          </div>
+
+          <div class="calc-card" style="background: rgba(139, 92, 246, 0.05); border: 1px solid #8b5cf6;">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Vértice Inicio Corte:</label>
+                <select class="form-control" id="selSubdivV1" onchange="actualizarCalculos()">
+                  <option value="1">V1</option>
+                  <option value="2">V2</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Vértice Fin Corte:</label>
+                <select class="form-control" id="selSubdivV2" onchange="actualizarCalculos()">
+                  <option value="3">V3</option>
+                  <option value="4">V4</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="background:#091524; padding:10px; border-radius:8px; display:flex; flex-direction:column; gap:6px;">
+              <div class="calc-row">
+                <span style="color:#a78bfa; font-weight:700;">🟢 Fracción A (Lote 1):</span>
+                <b class="calc-val" id="subdivAreaA" style="color:#a78bfa;">0.00 m² (0%)</b>
+              </div>
+              <div class="calc-row">
+                <span style="color:#38bdf8; font-weight:700;">🔵 Fracción B (Lote 2):</span>
+                <b class="calc-val" id="subdivAreaB" style="color:#38bdf8;">0.00 m² (0%)</b>
+              </div>
+              <div class="calc-row" style="border-top:1px solid rgba(255,255,255,0.1); padding-top:4px;">
+                <span>Longitud Línea Divisoria:</span>
+                <b class="calc-val" id="subdivLongitudLinea" style="color:var(--gold);">0.00 m</b>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: FOTOGRAFÍAS DE CAMPO & MOJONERAS -->
+        <div class="tab-content" id="tab-fotos">
+          <div style="font-size:0.75rem; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+            <span>Registro Fotográfico de Mojoneras</span>
+            <button class="tool-btn active" style="padding:3px 8px; font-size:0.72rem;" onclick="abrirCamaraVertice()">📷 Tomar / Subir Foto</button>
+          </div>
+
+          <div id="fotosGaleriaContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; max-height:280px; overflow-y:auto;">
+            <div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--text-muted); font-size:0.75rem;">
+              Sin fotos adjuntas a las mojoneras.<br>Toma fotos a los vértices con tu celular para anexarlas al reporte.
+            </div>
+          </div>
+          <input type="file" id="inputFotoVertice" accept="image/*" capture="environment" style="display:none;" onchange="procesarFotoVertice(event)">
+        </div>
+
+        <!-- TAB 2: MEMBRETE Y DATOS DEL PROYECTO -->
+        <div class="tab-content" id="tab-membrete">
+          <div class="form-group">
+            <label>Nombre del Predio / Terreno</label>
+            <input type="text" class="form-control" id="cfgProyecto" value="Terreno Campestre Lote 7" oninput="redibujar()">
+          </div>
+
+          <div class="form-group">
+            <label>Propietario / Titular</label>
+            <input type="text" class="form-control" id="cfgPropietario" value="Ing. Manuel González" oninput="redibujar()">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Ubicación / Municipio</label>
+              <input type="text" class="form-control" id="cfgUbicacion" value="Sector Poniente" oninput="redibujar()">
+            </div>
+            <div class="form-group">
+              <label>Levantó / Topógrafo</label>
+              <input type="text" class="form-control" id="cfgTopografo" value="Topógrafo Pro GPS" oninput="redibujar()">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Clave Catastral / Referencia</label>
+            <input type="text" class="form-control" id="cfgClave" value="CAT-2026-904" oninput="redibujar()">
+          </div>
+
+          <div class="form-group">
+            <label>Notas Técnicas</label>
+            <textarea class="form-control" id="cfgNotas" rows="2" style="resize:none;" oninput="redibujar()">Levantamiento perimetral georreferenciado con sistema WGS84.</textarea>
+          </div>
+
+          <div style="font-size:0.7rem; color:var(--text-muted); background:rgba(0,0,0,0.2); padding:8px; border-radius:6px;">
+            ℹ️ Estos datos se graban automáticamente en el plano de exportación y el reporte impreso.
+          </div>
+        </div>
+
+        <!-- TAB 3: PRESUPUESTO & VALUACIÓN -->
+        <div class="tab-content" id="tab-calculos">
+          <div class="calc-card">
+            <div style="font-weight:700; font-size:0.85rem; color:var(--cyan); border-bottom:1px solid var(--border-color); padding-bottom:6px;">
+              Valuación del Terreno
+            </div>
+            <div class="form-group">
+              <label>Precio comercial por m² ($):</label>
+              <input type="number" class="form-control" id="valPrecioM2" value="850" oninput="calcularPresupuestos()">
+            </div>
+            <div class="calc-row">
+              <span>Valor Comercial Estimado:</span>
+              <span class="calc-val" id="valValorTotal">$ 0.00</span>
+            </div>
+          </div>
+
+          <div class="calc-card">
+            <div style="font-weight:700; font-size:0.85rem; color:var(--gold); border-bottom:1px solid var(--border-color); padding-bottom:6px;">
+              Presupuesto Cercado / Barda
+            </div>
+            <div class="form-group">
+              <label>Costo por metro lineal de cerca ($):</label>
+              <input type="number" class="form-control" id="valCostoMetroLineal" value="420" oninput="calcularPresupuestos()">
+            </div>
+            <div class="calc-row">
+              <span>Metros Lineales Requeridos:</span>
+              <span class="calc-val" id="valMetrosCerca">0.00 m</span>
+            </div>
+            <div class="calc-row">
+              <span>Inversión en Cercado:</span>
+              <span class="calc-val" id="valCostoCercaTotal">$ 0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: ALTIMETRÍA, DESNIVEL & CORTE CON BULLDOZER -->
+        <div class="tab-content" id="tab-altimetria">
+          <div class="calc-card" style="background: rgba(16, 185, 129, 0.04); border: 1px solid var(--green);">
+            <div style="font-weight:700; font-size:0.85rem; color:var(--green); border-bottom:1px solid var(--border-color); padding-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+              <span>⛰️ Desnivel & Pendiente del Terreno</span>
+              <span id="altDesnivelBadge" style="font-family:var(--font-mono); font-size:0.75rem; background:rgba(16,185,129,0.2); padding:2px 6px; border-radius:4px; color:var(--green);">Inclinación</span>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Cota Punto Más Bajo (m):</label>
+                <input type="number" step="0.1" class="form-control" id="altCotaBaja" value="0.0" oninput="calcularAltimetria()">
+              </div>
+              <div class="form-group">
+                <label>Cota Punto Más Alto (m):</label>
+                <input type="number" step="0.1" class="form-control" id="altCotaAlta" value="1.4" oninput="calcularAltimetria()">
+              </div>
+            </div>
+
+            <div class="calc-row">
+              <span>Desnivel Total del Terreno:</span>
+              <span class="calc-val" id="altDesnivelTotal" style="color:var(--cyan);">1.40 m</span>
+            </div>
+            <div class="calc-row">
+              <span>Pendiente Media Natural:</span>
+              <span class="calc-val" id="altPendientePorc" style="color:var(--gold);">4.20 %</span>
+            </div>
+          </div>
+
+          <div class="calc-card" style="background: rgba(255, 183, 3, 0.05); border: 1px solid var(--gold);">
+            <div style="font-weight:700; font-size:0.85rem; color:var(--gold); border-bottom:1px solid var(--border-color); padding-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+              <span>🚜 Promontorio / "Chipote" a Rebajar</span>
+              <label style="font-size:0.7rem; color:#fff; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                <input type="checkbox" id="chkActivarChipote" checked onchange="calcularAltimetria()"> Dibujar en Plano
+              </label>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Altura del Chipote (m):</label>
+                <input type="number" step="0.1" class="form-control" id="chipoteAltura" value="1.8" oninput="calcularAltimetria()">
+              </div>
+              <div class="form-group">
+                <label>Diámetro en Base (m):</label>
+                <input type="number" step="0.5" class="form-control" id="chipoteDiametro" value="8.0" oninput="calcularAltimetria()">
+              </div>
+            </div>
+
+            <div style="background: #091524; border-radius: 8px; padding: 10px; border: 1px dashed var(--border-color); display:flex; flex-direction:column; gap:6px;">
+              <div class="calc-row">
+                <span>Volumen de Tierra a Cortar:</span>
+                <span class="calc-val" id="chipoteVolumen" style="color:var(--cyan); font-size:1.1rem;">30.16 m³</span>
+              </div>
+              <div class="calc-row">
+                <span>Volumen Suelto (+20% esponjamiento):</span>
+                <span class="calc-val" id="chipoteVolSuelto">36.19 m³</span>
+              </div>
+              <div class="calc-row" style="border-top:1px solid rgba(255,255,255,0.1); padding-top:4px;">
+                <span>Viajes de Camión Volteo (7 m³):</span>
+                <b class="calc-val" id="chipoteCamiones" style="color:var(--gold);">≈ 5 viajes</b>
+              </div>
+              <div class="calc-row">
+                <span>Tiempo Est. Bulldozer (D6):</span>
+                <b class="calc-val" id="chipoteHorasMaq" style="color:#10b981;">≈ 1.5 horas</b>
+              </div>
+            </div>
+
+            <button class="tool-btn active" style="width:100%; justify-content:center; margin-top:4px; font-weight:700;" onclick="abrirModalPerfilCorte()">
+              📊 Ver Perfil de Corte Transversal A-A' (Bulldozer)
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- BARRA DE ACCIÓN INFERIOR (DISEÑADA PARA TRABAJO EN CAMPO CON EL PULGAR) -->
+  <div class="field-action-bar">
+    <div class="action-bar-inner">
+      <!-- Botón de Captura Rápida -->
+      <button class="btn-main-capture" id="btnCapturaRapida" onclick="capturarVerticeGPS(false)">
+        <span style="font-size:1.3rem;">📍</span>
+        <span>Guardar Vértice GPS</span>
+      </button>
+
+      <!-- Botón Promediado de Alta Precisión (5 muestras) -->
+      <button class="btn-action-sec" onclick="capturarConPromedio()" title="Toma 5 lecturas consecutivas para mayor precisión topográfica">
+        <span style="font-size:1.1rem; color:var(--gold);">📐</span>
+        <span>Promediar</span>
+      </button>
+
+      <!-- Botón Deshacer -->
+      <button class="btn-action-sec" onclick="deshacerUltimo()" title="Borrar el último punto ingresado">
+        <span style="font-size:1.1rem;">↩️</span>
+        <span>Deshacer</span>
+      </button>
+
+      <!-- Botón Limpiar Todo -->
+      <button class="btn-action-sec danger" onclick="reiniciarPoligono()" title="Borrar todo y empezar nuevo levantamiento">
+        <span style="font-size:1.1rem;">🗑️</span>
+        <span>Reiniciar</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: PLANTILLAS DE EJEMPLO DEMO -->
+  <div class="modal-backdrop" id="modalEjemplos">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>📐 Cargar Plantilla de Ejemplo</h3>
+        <button class="modal-close" onclick="cerrarModal('modalEjemplos')">&times;</button>
+      </div>
+      <p style="font-size:0.8rem; color:var(--text-muted);">
+        Prueba al instante cómo luce un plano arquitectónico con cotas y cuadro de construcción sin necesidad de salir al campo:
+      </p>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div class="export-btn" onclick="cargarPlantillaDemo('urbano')">
+          <b>🏡 Lote Residencial Urbano (12m x 25m)</b>
+          <span>Rectangular con ángulos rectos (300 m²), ideal para lotificaciones residenciales.</span>
+        </div>
+
+        <div class="export-btn" onclick="cargarPlantillaDemo('irregular')">
+          <b>🌾 Terreno Campestre Irregular (5 Lados)</b>
+          <span>Polígono con lados inclinados, cotas diversas y ángulos obtusos/agudos (875 m²).</span>
+        </div>
+
+        <div class="export-btn" onclick="cargarPlantillaDemo('enL')">
+          <b>📐 Terreno en Forma de 'L' (6 Vértices)</b>
+          <span>Predio con esquinas internas y quiebres topográficos complejos (540 m²).</span>
+        </div>
+
+        <div class="export-btn" onclick="cargarPlantillaDemo('rancho')">
+          <b>🚜 Parcela Agrícola Campestre (Hectáreas)</b>
+          <span>Polígono de mayor escala con rumbos y distancias de gran envergadura (2.85 ha).</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EXPORTAR PLANO ARQUITECTÓNICO -->
+  <div class="modal-backdrop" id="modalExportar">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>📥 Exportar Plano & Documentos</h3>
+        <button class="modal-close" onclick="cerrarModal('modalExportar')">&times;</button>
+      </div>
+
+      <div class="export-grid">
+        <div class="export-btn" onclick="exportarPlanoImagenHD()">
+          <b>🖼️ Plano PNG en Alta Resolución</b>
+          <span>Imagen nítida lista para imprimir con membrete, cotas y cuadro de construcción.</span>
+        </div>
+
+        <div class="export-btn" onclick="imprimirPlano()">
+          <b>🖨️ Imprimir / Guardar en PDF</b>
+          <span>Formato arquitectónico horizontal limpio listo para presentación oficial.</span>
+        </div>
+
+        <div class="export-btn" onclick="exportarDXF()">
+          <b>📐 Archivo DXF (AutoCAD)</b>
+          <span>Polígono y cotas vectoriales compatibles con AutoCAD, LibreCAD y SketchUp.</span>
+        </div>
+
+        <div class="export-btn" onclick="exportarKML()">
+          <b>🌍 Archivo KML (Google Earth)</b>
+          <span>Visualiza el polígono del terreno directamente sobre el satélite de Google Earth.</span>
+        </div>
+
+        <div class="export-btn" onclick="exportarGeoJSON()">
+          <b>🌐 Archivo GeoJSON (SIG / QGIS)</b>
+          <span>Formato estándar geoespacial para arquitectos, ingenieros y catastro.</span>
+        </div>
+
+        <div class="export-btn" onclick="exportarInformeTecnicoCompleto()">
+          <b>📄 Informe Técnico & Altimetría (TXT / Dictamen)</b>
+          <span>Expediente completo con coordenadas UTM/WGS84, cotas, pendiente, volumen de corte, colindancias y avalúo.</span>
+        </div>
+
+        <div class="export-btn" onclick="exportarCSV()">
+          <b>📊 Cuadro de Construcción (Excel CSV)</b>
+          <span>Tabla de coordenadas (X, Y, Lat, Lon), distancias, rumbos y ángulos para hojas de cálculo.</span>
+        </div>
+
+        <div class="export-btn" onclick="exportarArchivoProyectoTOPOMAP()">
+          <b>💾 Archivo de Respaldo (.TOPOMAP)</b>
+          <span>Guarda todo el proyecto con fotos, colindancias y altimetría para compartirlo o abrirlo en otro celular/PC.</span>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="tool-btn" onclick="cerrarModal('modalExportar')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GUARDAR LOTE / TERRENO EN MEMORIA -->
+  <div class="modal-backdrop" id="modalGuardarLote">
+    <div class="modal-box" style="max-width:480px;">
+      <div class="modal-header">
+        <h3>💾 Guardar Terreno / Proyecto</h3>
+        <button class="modal-close" onclick="cerrarModal('modalGuardarLote')">&times;</button>
+      </div>
+      <p style="font-size:0.8rem; color:var(--text-muted);">
+        Guarda este levantamiento en la memoria interna de tu navegador para consultarlo, editarlo o imprimirlo cuando quieras:
+      </p>
+
+      <div class="form-group">
+        <label>Nombre del Terreno / Lote:</label>
+        <input type="text" class="form-control" id="saveLoteNombre" placeholder="Ej: Lote 14 - Fracc. San Ángel">
+      </div>
+      <div class="form-group">
+        <label>Notas / Referencias:</label>
+        <input type="text" class="form-control" id="saveLoteNotas" placeholder="Ej: Medido con GPS promediado y cinta 50m">
+      </div>
+
+      <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); padding:10px; border-radius:8px; font-size:0.75rem; color:#10b981; display:flex; justify-content:space-between;">
+        <span>Vértices: <b id="saveLotePts">0</b></span>
+        <span>Superficie: <b id="saveLoteArea">0.00 m²</b></span>
+        <span>Perímetro: <b id="saveLotePerim">0.00 m</b></span>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+        <button class="tool-btn" onclick="cerrarModal('modalGuardarLote')">Cancelar</button>
+        <button class="tool-btn active" style="background:var(--green); border-color:var(--green); color:#000;" onclick="confirmarGuardarLote()">💾 Guardar en Mis Terrenos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MIS TERRENOS GUARDADOS (GESTOR DE PROYECTOS) -->
+  <div class="modal-backdrop" id="modalMisLotes">
+    <div class="modal-box" style="max-width:650px;">
+      <div class="modal-header">
+        <h3>📁 Biblioteca de Terrenos Guardados</h3>
+        <button class="modal-close" onclick="cerrarModal('modalMisLotes')">&times;</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <p style="font-size:0.8rem; color:var(--text-muted);">
+          Selecciona un terreno guardado para cargarlo al instante con todas sus medidas, colindancias y fotos:
+        </p>
+        <button class="tool-btn" style="font-size:0.75rem;" onclick="document.getElementById('inputImportarTopomap').click()">
+          📥 Importar Archivo .TOPOMAP
+        </button>
+        <input type="file" id="inputImportarTopomap" accept=".topomap,.json" style="display:none;" onchange="importarArchivoTOPOMAP(event)">
+      </div>
+
+      <div id="listaMisTerrenosContainer" style="display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; margin-top:8px;">
+        <!-- Lista generada dinámicamente -->
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+        <span style="font-size:0.72rem; color:var(--text-muted);">💡 Los terrenos quedan guardados de forma segura y permanente en tu dispositivo.</span>
+        <button class="tool-btn" onclick="cerrarModal('modalMisLotes')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AGREGAR COORDENADA MANUAL -->
+  <div class="modal-backdrop" id="modalManualCoord">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>➕ Agregar Vértice Manualmente</h3>
+        <button class="modal-close" onclick="cerrarModal('modalManualCoord')">&times;</button>
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>Latitud (° Dec):</label>
+          <input type="number" step="any" class="form-control" id="manLat" placeholder="Ej: 25.686614">
+        </div>
+        <div class="form-group">
+          <label>Longitud (° Dec):</label>
+          <input type="number" step="any" class="form-control" id="manLon" placeholder="Ej: -100.316112">
+        </div>
+      </div>
+
+      <div style="font-size:0.75rem; color:var(--text-muted);">
+        O puedes agregar por desplazamiento métrico desde el último vértice:
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Distancia (metros):</label>
+          <input type="number" step="any" class="form-control" id="manDist" placeholder="Ej: 20.0">
+        </div>
+        <div class="form-group">
+          <label>Rumbo / Azimut (grados 0°-360°):</label>
+          <input type="number" step="any" class="form-control" id="manAzimut" placeholder="Ej: 90 (Este)">
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+        <button class="tool-btn" onclick="cerrarModal('modalManualCoord')">Cancelar</button>
+        <button class="tool-btn active" onclick="guardarCoordenadaManual()">Agregar al Polígono</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ASISTENTE DE CINTA MÉTRICA & ESCUADRAS (IDEAL BAJO EL SOL) -->
+  <div class="modal-backdrop" id="modalCintaMetrica">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>📏 Asistente de Cinta Métrica & Diagonales</h3>
+        <button class="modal-close" onclick="cerrarModal('modalCintaMetrica')">&times;</button>
+      </div>
+
+      <div style="display:flex; gap:6px; background:#0b1522; padding:4px; border-radius:8px; border:1px solid var(--border-color);">
+        <button class="tab-btn active" id="btnSubTabEscuadra" style="flex:1;" onclick="cambiarSubTabCinta('escuadra')">📐 Lote en Escuadra (Rectangular)</button>
+        <button class="tab-btn" id="btnSubTabIrregular" style="flex:1;" onclick="cambiarSubTabCinta('irregular')">🌾 4 Lados + Diagonal (Irregular)</button>
+      </div>
+
+      <!-- SUB-TAB 1: LOTE EN ESCUADRA (ANCHO X LARGO) -->
+      <div id="subTabCintaEscuadra" style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
+        <p style="font-size:0.8rem; color:var(--text-muted);">
+          Ingresa las medidas tomadas con cinta métrica para calcular el área y la diagonal que asegura que las esquinas queden a <b>90° en escuadra</b>:
+        </p>
+
+        <div style="background: rgba(0, 229, 255, 0.05); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Ancho (Lado 1 y 3) en metros:</label>
+              <input type="number" step="any" class="form-control" id="cintaAncho" value="5.0" oninput="actualizarAsistenteCinta()">
+            </div>
+            <div class="form-group">
+              <label>Largo (Lado 2 y 4) en metros:</label>
+              <input type="number" step="any" class="form-control" id="cintaLargo" value="5.0" oninput="actualizarAsistenteCinta()">
+            </div>
+          </div>
+
+          <div style="background: #091524; border-radius: 8px; padding: 12px; border: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 6px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+              <span>Área Total Calculada:</span>
+              <b style="color:var(--green); font-family:var(--font-mono); font-size:1.1rem;" id="cintaAreaRes">25.00 m²</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+              <span>Perímetro Total:</span>
+              <b style="color:var(--cyan); font-family:var(--font-mono);" id="cintaPerimRes">20.00 m</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:6px; margin-top:2px;">
+              <span>Diagonal de Comprobación (Pitágoras):</span>
+              <b style="color:var(--gold); font-family:var(--font-mono); font-size:1.05rem;" id="cintaDiagRes">7.07 m</b>
+            </div>
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+              🔍 <i>Regla de Oro en campo:</i> Mide con tu cinta métrica de esquina a esquina opuesta. Si mide exactamente <b id="cintaDiagTip" style="color:var(--gold);">7.07 m</b>, tu terreno está 100% en escuadra (ángulos rectos).
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="tool-btn" onclick="cerrarModal('modalCintaMetrica')">Cerrar</button>
+          <button class="tool-btn active" onclick="aplicarTerrenoCinta()">📐 Trazar este Terreno en el Plano</button>
+        </div>
+      </div>
+
+      <!-- SUB-TAB 2: TERRENO IRREGULAR (4 LADOS + 1 DIAGONAL) -->
+      <div id="subTabCintaIrregular" style="display:none; flex-direction:column; gap:10px; margin-top:8px;">
+        <p style="font-size:0.8rem; color:var(--text-muted);">
+          Mide los 4 linderos exteriores y <b>una sola diagonal cruzada</b> con tu cinta. La app aplicará la Ley de Cosenos (Triangulación) para determinar la forma real exacta:
+        </p>
+
+        <div style="background: rgba(255, 183, 3, 0.05); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Lado 1 (V1 a V2) en metros:</label>
+              <input type="number" step="any" class="form-control" id="irrLado1" value="14.5" oninput="actualizarAsistenteIrregular()">
+            </div>
+            <div class="form-group">
+              <label>Lado 2 (V2 a V3) en metros:</label>
+              <input type="number" step="any" class="form-control" id="irrLado2" value="20.0" oninput="actualizarAsistenteIrregular()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Lado 3 (V3 a V4) en metros:</label>
+              <input type="number" step="any" class="form-control" id="irrLado3" value="12.0" oninput="actualizarAsistenteIrregular()">
+            </div>
+            <div class="form-group">
+              <label>Lado 4 (V4 a V1) en metros:</label>
+              <input type="number" step="any" class="form-control" id="irrLado4" value="18.0" oninput="actualizarAsistenteIrregular()">
+            </div>
+          </div>
+          <div class="form-group">
+            <label style="color:var(--gold); font-weight:700;">Diagonal Cruzada (de V1 a V3) en metros:</label>
+            <input type="number" step="any" class="form-control" id="irrDiag" value="23.5" style="border-color:var(--gold); font-weight:700; color:var(--gold);" oninput="actualizarAsistenteIrregular()">
+          </div>
+
+          <div style="background: #091524; border-radius: 8px; padding: 12px; border: 1px dashed var(--border-color); display: flex; flex-direction: column; gap: 6px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+              <span>Superficie Triangulada:</span>
+              <b style="color:var(--green); font-family:var(--font-mono); font-size:1.1rem;" id="irrAreaRes">254.20 m²</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+              <span>Perímetro Total:</span>
+              <b style="color:var(--cyan); font-family:var(--font-mono);" id="irrPerimRes">64.50 m</b>
+            </div>
+            <div id="irrStatusMsg" style="font-size:0.75rem; color:#10b981;">
+              ✅ Geometría amarrada y matemáticamente cerrada.
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="tool-btn" onclick="cerrarModal('modalCintaMetrica')">Cerrar</button>
+          <button class="tool-btn active" onclick="aplicarTerrenoIrregularCinta()">📐 Trazar Terreno Irregular</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CAPTURA HÍBRIDA (GPS + CINTA MÉTRICA EN CAMPO) -->
+  <div class="modal-backdrop" id="modalCapturaHibrida">
+    <div class="modal-box" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3 id="hibridoTitulo">📍 Guardar Vértice V2</h3>
+        <button class="modal-close" onclick="cerrarModal('modalCapturaHibrida')">&times;</button>
+      </div>
+
+      <p style="font-size:0.82rem; color:var(--text-muted);">
+        El GPS detectó que caminaste hacia el rumbo: <b id="hibridoRumboTxt" style="color:var(--cyan);">N 45° E</b><br>
+        Distancia satelital calculada: <b id="hibridoDistEst" style="color:#fff;">12.4 m</b>
+      </p>
+
+      <div style="background: rgba(0, 229, 255, 0.05); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <label style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">
+          📏 Medida Exacta con Cinta Métrica (Opcional):
+        </label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="number" step="any" class="form-control" id="hibridoDistCinta" placeholder="Ej: 12.30" style="font-size:1.2rem; font-weight:700; color:var(--gold); flex:1;">
+          <span style="font-weight:700; color:var(--text-muted);">metros</span>
+        </div>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">
+          💡 <b>Fusión Topográfica:</b> Si ingresas los metros de tu cinta, la app mantendrá el rumbo del GPS pero calibrará la distancia al centímetro exacto de tu cinta.
+        </p>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+        <label style="font-size:0.72rem; color:var(--text-muted); display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="checkbox" id="chkSaltarHibrido"> No volver a preguntar (guardar siempre directo por GPS)
+        </label>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+        <button class="tool-btn" onclick="confirmarCapturaHibrida(false)">🛰️ Guardar solo con GPS</button>
+        <button class="tool-btn active" onclick="confirmarCapturaHibrida(true)">✅ Guardar Calibrado con Cinta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PERFIL DE CORTE TRANSVERSAL A-A' (BULLDOZER) -->
+  <div class="modal-backdrop" id="modalPerfilCorte">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3>📊 Perfil Transversal A-A' & Corte de Bulldozer</h3>
+        <button class="modal-close" onclick="cerrarModal('modalPerfilCorte')">&times;</button>
+      </div>
+
+      <p style="font-size:0.8rem; color:var(--text-muted);">
+        Visualización del terreno natural inclinado, el promontorio ("chipote") y la rasante de corte con maquinaria pesada:
+      </p>
+
+      <div style="background:#020813; border:1px solid var(--border-color); border-radius:10px; padding:10px;">
+        <canvas id="perfilCanvas" width="600" height="240" style="width:100%; height:240px; display:block;"></canvas>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:0.8rem;">
+        <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); padding:8px 12px; border-radius:8px;">
+          <span style="color:#f87171; font-weight:700;">VOLUMEN DE CORTE (BANCO):</span>
+          <b id="perfilVolumenTxt" style="display:block; font-size:1.1rem; color:#fff; font-family:var(--font-mono); margin-top:2px;">30.16 m³</b>
+        </div>
+        <div style="background:rgba(255,183,3,0.08); border:1px solid rgba(255,183,3,0.3); padding:8px 12px; border-radius:8px;">
+          <span style="color:var(--gold); font-weight:700;">CAMIONES DE VOLTEO (7 m³):</span>
+          <b id="perfilCamionesTxt" style="display:block; font-size:1.1rem; color:#fff; font-family:var(--font-mono); margin-top:2px;">≈ 5 viajes</b>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="tool-btn" onclick="cerrarModal('modalPerfilCorte')">Cerrar Visor</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* =====================================================================
+       TOPÓGRAFO PRO GPS - SISTEMA INTEGRADO DE PLANOS Y CROQUIS
+       ===================================================================== */
+
+    // Estado de la aplicación
+    let vertices = []; // Array de { lat, lon, acc, elev, timestamp }
+    let watchId = null;
+    let ultimaPosicion = null;
+    let promediandoGPS = false;
+    let muestrasGPS = [];
+
+    // Estado del Canvas CAD
+    let canvasTheme = 'blueprint'; // 'blueprint', 'darkcad', 'white'
+    let capasVisibles = {
+      cotas: true,
+      angulos: true,
+      grid: true,
+      norte: true,
+      escala: true,
+      vertices: true,
+      relleno: true,
+      membrete: true,
+      altimetria: true
+    };
+    let modoDibujoManual = false;
+    let panX = 0;
+    let panY = 0;
+    let zoomLevel = 1.0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+
+    // Referencias a elementos del DOM
+    const canvas = document.getElementById('planCanvas');
+    const ctx = canvas.getContext('2d');
+    const canvasWrapper = document.getElementById('canvasWrapper');
+
+    const gpsState = document.getElementById('gpsState');
+    const gpsDot = document.getElementById('gpsDot');
+    const gpsCoords = document.getElementById('gpsCoords');
+    const accuracyVal = document.getElementById('accuracyVal');
+    const accuracyBadge = document.getElementById('accuracyBadge');
+    const areaDisplay = document.getElementById('areaDisplay');
+    const areaHaDisplay = document.getElementById('areaHaDisplay');
+    const perimeterDisplay = document.getElementById('perimeterDisplay');
+    const sidesDisplay = document.getElementById('sidesDisplay');
+    const tablaConstruccionBody = document.getElementById('tablaConstruccionBody');
+    const tabCountPts = document.getElementById('tabCountPts');
+    const hudEscala = document.getElementById('hudEscala');
+    const hudNorte = document.getElementById('hudNorte');
+    const hudGeometria = document.getElementById('hudGeometria');
+
+    // Inicialización al cargar la ventana
+    window.addEventListener('DOMContentLoaded', () => {
+      ajustarResolucionCanvas();
+      iniciarGPS();
+      cargarPlantillaDemo('irregular'); // Iniciar con un plano atractivo ya visible
+      actualizarCalculos();
+    });
+
+    window.addEventListener('resize', () => {
+      ajustarResolucionCanvas();
+      redibujar();
+    });
+
+    function ajustarResolucionCanvas() {
+      const rect = canvasWrapper.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const w = rect.width || canvasWrapper.clientWidth || 600;
+      const h = rect.height || canvasWrapper.clientHeight || 520;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+    }
+
+
+
+    /* =====================================================================
+       GPS & GEOLOCALIZACIÓN DE ALTA PRECISIÓN
+       ===================================================================== */
+    function iniciarGPS() {
+      if (!('geolocation' in navigator)) {
+        gpsState.innerText = "GPS no disponible";
+        gpsDot.style.background = "var(--red)";
+        return;
+      }
+
+      gpsState.innerText = "Conectando satélites...";
+      gpsDot.style.background = "var(--gold)";
+
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          ultimaPosicion = pos.coords;
+          const acc = pos.coords.accuracy;
+          
+          gpsState.innerText = "Señal GPS Activa";
+          gpsDot.style.background = "var(--green)";
+          gpsCoords.innerText = `Lat: ${pos.coords.latitude.toFixed(6)} | Lon: ${pos.coords.longitude.toFixed(6)}`;
+
+          accuracyVal.innerText = `± ${acc.toFixed(1)} m`;
+
+          if (acc <= 4.0) {
+            accuracyBadge.className = "badge-accuracy badge-good";
+            accuracyBadge.innerText = "Excelente";
+          } else if (acc <= 8.0) {
+            accuracyBadge.className = "badge-accuracy badge-mid";
+            accuracyBadge.innerText = "Aceptable";
+          } else {
+            accuracyBadge.className = "badge-accuracy badge-bad";
+            accuracyBadge.innerText = "Baja Señal";
+          }
+
+          // Si estamos recolectando muestras para promedio
+          if (promediandoGPS) {
+            muestrasGPS.push({
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude,
+              acc: acc
+            });
+          }
+        },
+        (err) => {
+          gpsState.innerText = "Sin Acceso GPS";
+          gpsDot.style.background = "var(--red)";
+          accuracyBadge.className = "badge-accuracy badge-bad";
+          accuracyBadge.innerText = "Error";
+          accuracyVal.innerText = "--";
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 20000
+        }
+      );
+    }
+
+    let verticePendienteGPS = null;
+
+    function capturarVerticeGPS(silencioso = false) {
+      if (!ultimaPosicion) {
+        alert("Aún no se ha recibido señal de satélites GPS. Asegúrate de tener la ubicación activada y estar a cielo abierto.");
+        return;
+      }
+
+      if (ultimaPosicion.accuracy > 12.0 && !silencioso) {
+        const confirmar = confirm(`La precisión GPS actual es de ±${ultimaPosicion.accuracy.toFixed(1)}m (regular). ¿Deseas guardar este punto de todas formas o prefieres usar la función "Promediar"?`);
+        if (!confirmar) return;
+      }
+
+      const nuevoVertice = {
+        lat: ultimaPosicion.latitude,
+        lon: ultimaPosicion.longitude,
+        acc: ultimaPosicion.accuracy || 1.0,
+        elev: ultimaPosicion.altitude || 0,
+        timestamp: new Date().toLocaleTimeString()
+      };
+
+      // Si es el primer vértice o el usuario marcó saltar modo híbrido:
+      const saltarHibrido = document.getElementById('chkSaltarHibrido') ? document.getElementById('chkSaltarHibrido').checked : false;
+      if (vertices.length === 0 || saltarHibrido) {
+        vertices.push(nuevoVertice);
+        feedbackSonoro();
+        feedbackVibracion();
+        actualizarCalculos();
+        centrarPlano();
+        if (vertices.length === 1) {
+          alert("📍 Vértice V1 fijado como punto de origen. Camina hacia el Vértice V2.");
+        }
+        return;
+      }
+
+      // Si ya hay vértices previos, abrir el modal híbrido para calibrar con cinta opcional
+      verticePendienteGPS = nuevoVertice;
+      const ultimo = vertices[vertices.length - 1];
+
+      // Proyectar coordenadas para calcular distancia y rumbo estimado desde el último
+      const R = 6378137.0;
+      const latRef = ultimo.lat * (Math.PI / 180);
+      const lonRef = ultimo.lon * (Math.PI / 180);
+      const dx = (nuevoVertice.lon * (Math.PI / 180) - lonRef) * Math.cos(latRef) * R;
+      const dy = (nuevoVertice.lat * (Math.PI / 180) - latRef) * R;
+      const distEst = Math.hypot(dx, dy);
+      const az = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+      const rumboTxt = formatearRumbo(az);
+
+      document.getElementById('hibridoTitulo').innerText = `📍 Guardar Vértice V${vertices.length + 1}`;
+      document.getElementById('hibridoRumboTxt').innerText = rumboTxt;
+      document.getElementById('hibridoDistEst').innerText = `${distEst.toFixed(1)} m`;
+      document.getElementById('hibridoDistCinta').value = "";
+      document.getElementById('modalCapturaHibrida').classList.add('open');
+      setTimeout(() => document.getElementById('hibridoDistCinta').focus(), 250);
+    }
+
+    function confirmarCapturaHibrida(usarCinta) {
+      if (!verticePendienteGPS) return;
+      cerrarModal('modalCapturaHibrida');
+
+      const ultimo = vertices[vertices.length - 1];
+      const distCinta = parseFloat(document.getElementById('hibridoDistCinta').value);
+
+      if (usarCinta && !isNaN(distCinta) && distCinta > 0) {
+        // Modo Híbrido: Calibrar posición exacta a lo largo del rumbo GPS
+        const R = 6378137.0;
+        const latRef = ultimo.lat * (Math.PI / 180);
+        const lonRef = ultimo.lon * (Math.PI / 180);
+        const dxGPS = (verticePendienteGPS.lon * (Math.PI / 180) - lonRef) * Math.cos(latRef) * R;
+        const dyGPS = (verticePendienteGPS.lat * (Math.PI / 180) - latRef) * R;
+        const azRad = Math.atan2(dxGPS, dyGPS); // Dirección angular del GPS
+
+        // Distancia exacta de la cinta proyectada en esa dirección
+        const dxCalibrado = distCinta * Math.sin(azRad);
+        const dyCalibrado = distCinta * Math.cos(azRad);
+
+        const deltaLat = dyCalibrado / R;
+        const deltaLon = dxCalibrado / (R * Math.cos(latRef));
+
+        vertices.push({
+          lat: (latRef + deltaLat) * (180 / Math.PI),
+          lon: (lonRef + deltaLon) * (180 / Math.PI),
+          acc: 0.1, // Calibrado con cinta milimétrica
+          elev: verticePendienteGPS.elev || 0,
+          timestamp: new Date().toLocaleTimeString(),
+          metodo: 'hibrido'
+        });
+      } else {
+        // Guardar coordenadas directas del GPS
+        vertices.push(verticePendienteGPS);
+      }
+
+      verticePendienteGPS = null;
+      feedbackSonoro();
+      feedbackVibracion();
+      actualizarCalculos();
+      centrarPlano();
+    }
+
+    function capturarConPromedio() {
+      if (!ultimaPosicion) {
+        alert("Buscando señal GPS para iniciar promedio...");
+        return;
+      }
+
+      promediandoGPS = true;
+      muestrasGPS = [];
+      const btn = document.getElementById('btnCapturaRapida');
+      const textoOriginal = btn.innerHTML;
+      btn.innerHTML = `<span>⏳</span><span>Muestreando GPS (0/5)...</span>`;
+
+      let intervalo = setInterval(() => {
+        btn.innerHTML = `<span>⏳</span><span>Muestreando GPS (${muestrasGPS.length}/5)...</span>`;
+        if (muestrasGPS.length >= 5) {
+          clearInterval(intervalo);
+          promediandoGPS = false;
+          btn.innerHTML = textoOriginal;
+
+          // Promedio de coordenadas
+          const sumLat = muestrasGPS.reduce((a, b) => a + b.lat, 0);
+          const sumLon = muestrasGPS.reduce((a, b) => a + b.lon, 0);
+          const minAcc = Math.min(...muestrasGPS.map(m => m.acc));
+
+          vertices.push({
+            lat: sumLat / muestrasGPS.length,
+            lon: sumLon / muestrasGPS.length,
+            acc: minAcc,
+            elev: ultimaPosicion.altitude || 0,
+            timestamp: new Date().toLocaleTimeString()
+          });
+
+          feedbackSonoro(true);
+          feedbackVibracion();
+          actualizarCalculos();
+          centrarPlano();
+          alert(`✅ Vértice V${vertices.length} registrado con alta precisión promediada (±${minAcc.toFixed(1)}m).`);
+        }
+      }, 700);
+    }
+
+    function deshacerUltimo() {
+      if (vertices.length > 0) {
+        vertices.pop();
+        actualizarCalculos();
+      }
+    }
+
+    function reiniciarPoligono() {
+      if (vertices.length === 0) return;
+      if (confirm("¿Estás seguro de que deseas borrar todas las medidas del terreno y comenzar uno nuevo?")) {
+        vertices = [];
+        actualizarCalculos();
+      }
+    }
+
+    function feedbackSonoro(esDoble = false) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = esDoble ? 880 : 587;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      } catch (e) {
+        // Silencioso si no hay soporte WebAudio
+      }
+    }
+
+    function feedbackVibracion() {
+      if ('vibrate' in navigator) {
+        navigator.vibrate([60, 40, 80]);
+      }
+    }
+
+    /* =====================================================================
+       CÁLCULOS TOPOGRÁFICOS: PROYECCIÓN LOCAL, RUMBOS, AZIMUTS Y ÁNGULOS
+       ===================================================================== */
+
+    // Convierte coordenadas Lat/Lon a coordenadas métricas planas locales (WGS84 Equirectangular centrado)
+    function proyectarAMetros(pts) {
+      if (pts.length === 0) return [];
+      const latRef = pts[0].lat * (Math.PI / 180);
+      const lonRef = pts[0].lon * (Math.PI / 180);
+      const R = 6378137.0; // Radio ecuatorial WGS84 en metros
+
+      return pts.map((p, idx) => {
+        const latRad = p.lat * (Math.PI / 180);
+        const lonRad = p.lon * (Math.PI / 180);
+        const x = (lonRad - lonRef) * Math.cos(latRef) * R;
+        const y = (latRad - latRef) * R;
+        return {
+          x: x,
+          y: y,
+          lat: p.lat,
+          lon: p.lon,
+          acc: p.acc || 0,
+          idx: idx + 1
+        };
+      });
+    }
+
+    // Calcula azimut topográfico de punto A hacia punto B (0° a 360° medido en sentido horario desde el Norte)
+    function calcularAzimut(p1, p2) {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      let rad = Math.atan2(dx, dy); // dy es eje Norte
+      let deg = (rad * 180 / Math.PI + 360) % 360;
+      return deg;
+    }
+
+    // Formatea azimut a Rumbo Topográfico oficial (ej. N 45° 15' 20" E)
+    function formatearRumbo(azimut) {
+      let cuadrante = "";
+      let angulo = 0;
+
+      if (azimut >= 0 && azimut < 90) {
+        cuadrante = "NE";
+        angulo = azimut;
+      } else if (azimut >= 90 && azimut < 180) {
+        cuadrante = "SE";
+        angulo = 180 - azimut;
+      } else if (azimut >= 180 && azimut < 270) {
+        cuadrante = "SW";
+        angulo = azimut - 180;
+      } else {
+        cuadrante = "NW";
+        angulo = 360 - azimut;
+      }
+
+      const grados = Math.floor(angulo);
+      const minutosDec = (angulo - grados) * 60;
+      const minutos = Math.floor(minutosDec);
+      const segundos = Math.round((minutosDec - minutos) * 60);
+
+      const orientacion1 = cuadrante.charAt(0);
+      const orientacion2 = cuadrante.charAt(1);
+
+      return `${orientacion1} ${grados}° ${minutos.toString().padStart(2, '0')}' ${segundos.toString().padStart(2, '0')}" ${orientacion2}`;
+    }
+
+    // Calcula el ángulo interior en un vértice i
+    function calcularAnguloInterior(prev, curr, next) {
+      const v1x = prev.x - curr.x;
+      const v1y = prev.y - curr.y;
+      const v2x = next.x - curr.x;
+      const v2y = next.y - curr.y;
+
+      const dot = v1x * v2x + v1y * v2y;
+      const mag1 = Math.hypot(v1x, v1y);
+      const mag2 = Math.hypot(v2x, v2y);
+
+      if (mag1 === 0 || mag2 === 0) return 0;
+      let cosVal = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+      let ang = Math.acos(cosVal) * 180 / Math.PI;
+      return ang;
+    }
+
+    function actualizarCalculos() {
+      tabCountPts.innerText = `${vertices.length} Vértices`;
+      sidesDisplay.innerText = `${vertices.length} vértices registrados`;
+
+      const pts = proyectarAMetros(vertices);
+
+      // Limpiar tabla de construcción
+      tablaConstruccionBody.innerHTML = "";
+
+      if (pts.length < 2) {
+        areaDisplay.innerHTML = `0.00 <span style="font-size:0.8rem; font-weight:400;">m²</span>`;
+        areaHaDisplay.innerText = `0.0000 Hectáreas`;
+        perimeterDisplay.innerHTML = `0.00 <span style="font-size:0.8rem; font-weight:400;">m</span>`;
+        hudGeometria.innerText = pts.length === 1 ? "1 Vértice marcado" : "Polígono Vacío";
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="5" style="text-align:center; padding:18px; color:var(--text-muted);">Registra al menos 3 vértices para cerrar el polígono del terreno.</td>`;
+        tablaConstruccionBody.appendChild(tr);
+        redibujar();
+        calcularPresupuestos();
+        return;
+      }
+
+      let perimetroTotal = 0;
+      const numPuntos = pts.length;
+      const estaCerrado = numPuntos >= 3;
+
+      for (let i = 0; i < numPuntos; i++) {
+        const esUltimoLado = (i === numPuntos - 1);
+        if (esUltimoLado && !estaCerrado) break;
+
+        const pA = pts[i];
+        const pB = pts[(i + 1) % numPuntos];
+
+        const dist = Math.hypot(pB.x - pA.x, pB.y - pA.y);
+        perimetroTotal += dist;
+
+        const azimut = calcularAzimut(pA, pB);
+        const rumboStr = formatearRumbo(azimut);
+
+        // Ángulo interior en pA
+        let anguloIntStr = "--";
+        if (estaCerrado) {
+          const pPrev = pts[(i - 1 + numPuntos) % numPuntos];
+          const ang = calcularAnguloInterior(pPrev, pA, pB);
+          anguloIntStr = `${ang.toFixed(1)}°`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="badge-pt">V${i + 1}</span></td>
+          <td>V${i + 1} - V${(i + 1) % numPuntos + 1}</td>
+          <td><b>${dist.toFixed(2)} m</b></td>
+          <td style="color:var(--cyan);">${rumboStr}</td>
+          <td>${anguloIntStr}</td>
+        `;
+        tablaConstruccionBody.appendChild(tr);
+      }
+
+      perimeterDisplay.innerHTML = `${perimetroTotal.toFixed(2)} <span style="font-size:0.8rem; font-weight:400;">m</span>`;
+
+      // Cálculo de Área mediante Fórmula de Gauss (Shoelace)
+      let areaM2 = 0;
+      if (estaCerrado) {
+        for (let i = 0; i < numPuntos; i++) {
+          const j = (i + 1) % numPuntos;
+          areaM2 += pts[i].x * pts[j].y;
+          areaM2 -= pts[j].x * pts[i].y;
+        }
+        areaM2 = Math.abs(areaM2) / 2.0;
+        hudGeometria.innerText = `Polígono Cerrado (${numPuntos} lados)`;
+      } else {
+        hudGeometria.innerText = `Línea Abierta (${numPuntos} puntos)`;
+      }
+
+      areaDisplay.innerHTML = `${areaM2.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style="font-size:0.8rem; font-weight:400;">m²</span>`;
+      const ha = areaM2 / 10000;
+      areaHaDisplay.innerText = `${ha.toFixed(4)} Hectáreas`;
+
+      redibujar();
+      calcularPresupuestos();
+      calcularAltimetria();
+      actualizarModuloColindancias();
+      actualizarModuloSubdivision();
+      if (typeof modoVistaActiva !== 'undefined' && modoVistaActiva === 'satelital') inicializarOActualizarMapaSat();
+      if (typeof modoVistaActiva !== 'undefined' && modoVistaActiva === '3d') construirGeometriaTerreno3D();
+    }
+
+    function calcularPresupuestos() {
+      const areaTexto = areaDisplay.innerText.replace(/[^\d.]/g, '');
+      const perimetroTexto = perimeterDisplay.innerText.replace(/[^\d.]/g, '');
+      const area = parseFloat(areaTexto) || 0;
+      const perimetro = parseFloat(perimetroTexto) || 0;
+
+      const precioM2 = parseFloat(document.getElementById('valPrecioM2').value) || 0;
+      const costoML = parseFloat(document.getElementById('valCostoMetroLineal').value) || 0;
+
+      const totalTerreno = area * precioM2;
+      const totalCerca = perimetro * costoML;
+
+      document.getElementById('valValorTotal').innerText = `$ ${totalTerreno.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      document.getElementById('valMetrosCerca').innerText = `${perimetro.toFixed(2)} m`;
+      document.getElementById('valCostoCercaTotal').innerText = `$ ${totalCerca.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    /* =====================================================================
+       RENDERIZADOR DE PLANO ARQUITECTÓNICO EN CANVAS
+       ===================================================================== */
+
+    function getThemeColors() {
+      if (canvasTheme === 'white') {
+        return {
+          bg: '#ffffff',
+          gridLine: 'rgba(15, 23, 42, 0.28)',
+          gridSub: 'rgba(15, 23, 42, 0.12)',
+          polygonFill: 'rgba(2, 132, 199, 0.08)',
+          polygonStroke: '#0f172a',
+          dimensionLine: '#0284c7',
+          dimensionText: '#0f172a',
+          dimensionBg: 'rgba(255, 255, 255, 0.95)',
+          vertexFill: '#0284c7',
+          vertexStroke: '#ffffff',
+          vertexLabel: '#0f172a',
+          angleArc: '#e11d48',
+          angleText: '#9f1239',
+          northNeedle: '#0284c7',
+          scaleBar: '#0f172a',
+          textMain: '#0f172a'
+        };
+      } else if (canvasTheme === 'darkcad') {
+        return {
+          bg: '#0a0f18',
+          gridLine: 'rgba(0, 229, 255, 0.35)',
+          gridSub: 'rgba(255, 255, 255, 0.14)',
+          polygonFill: 'rgba(0, 229, 255, 0.08)',
+          polygonStroke: '#00e5ff',
+          dimensionLine: '#ffb703',
+          dimensionText: '#ffffff',
+          dimensionBg: '#0f1c2e',
+          vertexFill: '#ffb703',
+          vertexStroke: '#000000',
+          vertexLabel: '#ffffff',
+          angleArc: '#ec4899',
+          angleText: '#f472b6',
+          northNeedle: '#00e5ff',
+          scaleBar: '#ffffff',
+          textMain: '#f8fafc'
+        };
+      } else {
+        // BLUEPRINT CLÁSICO ARQUITECTÓNICO
+        return {
+          bg: '#061a33',
+          gridLine: 'rgba(56, 189, 248, 0.40)',
+          gridSub: 'rgba(56, 189, 248, 0.18)',
+          polygonFill: 'rgba(56, 189, 248, 0.12)',
+          polygonStroke: '#ffffff',
+          dimensionLine: '#38bdf8',
+          dimensionText: '#ffffff',
+          dimensionBg: '#092444',
+          vertexFill: '#38bdf8',
+          vertexStroke: '#ffffff',
+          vertexLabel: '#ffffff',
+          angleArc: '#fbbf24',
+          angleText: '#fde047',
+          northNeedle: '#38bdf8',
+          scaleBar: '#ffffff',
+          textMain: '#ffffff'
+        };
+      }
+    }
+
+    function setCanvasTheme(theme) {
+      canvasTheme = theme;
+      document.getElementById('btnThemeBlueprint').classList.toggle('active', theme === 'blueprint');
+      document.getElementById('btnThemeDarkCAD').classList.toggle('active', theme === 'darkcad');
+      document.getElementById('btnThemeWhite').classList.toggle('active', theme === 'white');
+      redibujar();
+      if (typeof scene3D !== 'undefined' && scene3D) {
+        construirGeometriaTerreno3D();
+      }
+    }
+
+    function toggleLayer(capa) {
+      capasVisibles[capa] = !capasVisibles[capa];
+      const btnMap = {
+        cotas: document.getElementById('btnToggleCotas'),
+        angulos: document.getElementById('btnToggleAngulos'),
+        grid: document.getElementById('btnToggleCuadricula'),
+        altimetria: document.getElementById('btnToggleAltimetria')
+      };
+      if (btnMap[capa]) {
+        btnMap[capa].classList.toggle('active', capasVisibles[capa]);
+        btnMap[capa].innerText = btnMap[capa].innerText.replace(/\[(ON|OFF)\]/, capasVisibles[capa] ? '[ON]' : '[OFF]');
+      }
+      redibujar();
+    }
+
+    function redibujar() {
+      const rect = canvasWrapper.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+
+      const colors = getThemeColors();
+
+      // Limpiar fondo
+      ctx.fillStyle = colors.bg;
+      ctx.fillRect(0, 0, w, h);
+
+      const pts = proyectarAMetros(vertices);
+
+      // Calcular límites métricos
+      let minX = -10, maxX = 10, minY = -10, maxY = 10;
+      if (pts.length > 0) {
+        minX = Math.min(...pts.map(p => p.x));
+        maxX = Math.max(...pts.map(p => p.x));
+        minY = Math.min(...pts.map(p => p.y));
+        maxY = Math.max(...pts.map(p => p.y));
+      }
+
+      const rangoX = Math.max(maxX - minX, 10);
+      const rangoY = Math.max(maxY - minY, 10);
+
+      const padding = 70;
+      const escalaBase = Math.min((w - padding * 2) / rangoX, (h - padding * 2) / rangoY);
+      const escalaFinal = escalaBase * zoomLevel;
+
+      const centroX = (minX + maxX) / 2;
+      const centroY = (minY + maxY) / 2;
+
+      // Función de transformación de coordenadas métricas a pantalla (Norte = +Y hacia arriba)
+      const toScreen = (p) => {
+        return {
+          sx: (w / 2) + (p.x - centroX) * escalaFinal + panX,
+          sy: (h / 2) - (p.y - centroY) * escalaFinal + panY
+        };
+      };
+
+      // Actualizar escala numérica en el HUD
+      const metrosPorPixel = 1 / escalaFinal;
+      const factorEscalaAprox = Math.round(metrosPorPixel * 1000);
+      hudEscala.innerText = `1 : ${factorEscalaAprox}`;
+
+      // 1. DIBUJAR CUADRÍCULA MILIMÉTRICA ARQUITECTÓNICA
+      if (capasVisibles.grid) {
+        dibujarMallaArquitectonica(w, h, escalaFinal, colors);
+      }
+
+      if (pts.length === 0) {
+        ctx.fillStyle = colors.dimensionText;
+        ctx.font = '500 14px "Space Grotesk", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("No hay vértices aún. Haz clic en 'Plantillas Demo' o usa el GPS para medir.", w / 2, h / 2);
+        return;
+      }
+
+      const numPts = pts.length;
+      const cerrado = numPts >= 3;
+
+      // Calcular orientación del polígono para cotas exteriores
+      let areaConSigno = 0;
+      if (cerrado) {
+        for (let i = 0; i < numPts; i++) {
+          let j = (i + 1) % numPts;
+          areaConSigno += (pts[i].x * pts[j].y) - (pts[j].x * pts[i].y);
+        }
+      }
+      const esSentidoAntihorario = areaConSigno > 0;
+
+      // 2. DIBUJAR POLÍGONO / ÁREA SOMBREADA
+      ctx.beginPath();
+      const p0 = toScreen(pts[0]);
+      ctx.moveTo(p0.sx, p0.sy);
+      for (let i = 1; i < numPts; i++) {
+        const pScr = toScreen(pts[i]);
+        ctx.lineTo(pScr.sx, pScr.sy);
+      }
+
+      if (cerrado) {
+        ctx.closePath();
+        if (capasVisibles.relleno) {
+          ctx.fillStyle = colors.polygonFill;
+          ctx.fill();
+        }
+      }
+
+      ctx.strokeStyle = colors.polygonStroke;
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // 3. DIBUJAR ÁNGULOS INTERIORES
+      if (cerrado && capasVisibles.angulos) {
+        for (let i = 0; i < numPts; i++) {
+          const pPrev = pts[(i - 1 + numPts) % numPts];
+          const pCurr = pts[i];
+          const pNext = pts[(i + 1) % numPts];
+
+          const angulo = calcularAnguloInterior(pPrev, pCurr, pNext);
+          const sCurr = toScreen(pCurr);
+
+          // Vector bisectriz para ubicar la etiqueta del ángulo
+          const v1x = pPrev.x - pCurr.x;
+          const v1y = pPrev.y - pCurr.y;
+          const v2x = pNext.x - pCurr.x;
+          const v2y = pNext.y - pCurr.y;
+
+          const l1 = Math.hypot(v1x, v1y) || 1;
+          const l2 = Math.hypot(v2x, v2y) || 1;
+
+          const bx = (v1x / l1 + v2x / l2);
+          const by = (v1y / l1 + v2y / l2);
+          const lb = Math.hypot(bx, by) || 1;
+
+          // Dirección hacia adentro
+          const distRadio = 28;
+          ctx.beginPath();
+          ctx.arc(sCurr.sx, sCurr.sy, 18, 0, Math.PI * 2);
+          ctx.strokeStyle = colors.angleArc;
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Texto del ángulo
+          const textX = sCurr.sx + (bx / lb) * distRadio;
+          const textY = sCurr.sy - (by / lb) * distRadio;
+
+          ctx.font = '700 10px "JetBrains Mono", monospace';
+          ctx.fillStyle = colors.angleText;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${angulo.toFixed(1)}°`, textX, textY);
+        }
+      }
+
+      // 4. DIBUJAR COTAS ARQUITECTÓNICAS (LÍNEAS DE DIMENSIÓN CON TICKS A 45°)
+      if (capasVisibles.cotas && numPts >= 2) {
+        for (let i = 0; i < numPts; i++) {
+          if (i === numPts - 1 && !cerrado) break;
+
+          const pA = pts[i];
+          const pB = pts[(i + 1) % numPts];
+
+          const sA = toScreen(pA);
+          const sB = toScreen(pB);
+
+          const dx = sB.sx - sA.sx;
+          const dy = sB.sy - sA.sy;
+          const longitudPx = Math.hypot(dx, dy);
+          if (longitudPx < 5) continue;
+
+          // Vector normal exterior (perpendicular al tramo)
+          let nx = -dy / longitudPx;
+          let ny = dx / longitudPx;
+
+          if (cerrado && !esSentidoAntihorario) {
+            nx = -nx;
+            ny = -ny;
+          }
+
+          const offsetCota = 26; // Desplazamiento exterior de la cota
+          const cotaA = { sx: sA.sx + nx * offsetCota, sy: sA.sy + ny * offsetCota };
+          const cotaB = { sx: sB.sx + nx * offsetCota, sy: sB.sy + ny * offsetCota };
+
+          // Líneas auxiliares de cota (extension lines)
+          ctx.beginPath();
+          ctx.moveTo(sA.sx + nx * 4, sA.sy + ny * 4);
+          ctx.lineTo(cotaA.sx + nx * 5, cotaA.sy + ny * 5);
+          ctx.moveTo(sB.sx + nx * 4, sB.sy + ny * 4);
+          ctx.lineTo(cotaB.sx + nx * 5, cotaB.sy + ny * 5);
+          ctx.strokeStyle = colors.dimensionLine;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 2]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Línea principal de cota
+          ctx.beginPath();
+          ctx.moveTo(cotaA.sx, cotaA.sy);
+          ctx.lineTo(cotaB.sx, cotaB.sy);
+          ctx.strokeStyle = colors.dimensionLine;
+          ctx.lineWidth = 1.4;
+          ctx.stroke();
+
+          // Ticks arquitectónicos a 45 grados (Architectural Slashes)
+          const tickLen = 6;
+          const drawTick = (pt) => {
+            ctx.beginPath();
+            ctx.moveTo(pt.sx - tickLen, pt.sy + tickLen);
+            ctx.lineTo(pt.sx + tickLen, pt.sy - tickLen);
+            ctx.lineWidth = 2.2;
+            ctx.strokeStyle = colors.dimensionLine;
+            ctx.stroke();
+          };
+          drawTick(cotaA);
+          drawTick(cotaB);
+
+          // Texto de la cota métrica
+          const distReal = Math.hypot(pB.x - pA.x, pB.y - pA.y);
+          const txtCota = `${distReal.toFixed(2)} m`;
+
+          const midX = (cotaA.sx + cotaB.sx) / 2;
+          const midY = (cotaA.sy + cotaB.sy) / 2;
+
+          ctx.font = '700 11px "JetBrains Mono", monospace';
+          const txtMetrics = ctx.measureText(txtCota);
+          const padBox = 4;
+
+          // Caja de fondo de la etiqueta de cota
+          ctx.fillStyle = colors.dimensionBg;
+          ctx.fillRect(midX - txtMetrics.width / 2 - padBox, midY - 8 - padBox, txtMetrics.width + padBox * 2, 16 + padBox);
+          ctx.strokeStyle = colors.dimensionLine;
+          ctx.lineWidth = 0.8;
+          ctx.strokeRect(midX - txtMetrics.width / 2 - padBox, midY - 8 - padBox, txtMetrics.width + padBox * 2, 16 + padBox);
+
+          ctx.fillStyle = colors.dimensionText;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(txtCota, midX, midY);
+        }
+      }
+
+      // 4.5 SELLO CENTRAL DE SUPERFICIE Y PERÍMETRO (CENTRO DEL CROQUIS ARQUITECTÓNICO)
+      if (cerrado && numPts >= 3) {
+        let centroideX = 0, centroideY = 0;
+        pts.forEach(p => { centroideX += p.x; centroideY += p.y; });
+        centroideX /= numPts;
+        centroideY /= numPts;
+
+        const sC = toScreen({ x: centroideX, y: centroideY });
+
+        let areaVal = 0;
+        for (let i = 0; i < numPts; i++) {
+          let j = (i + 1) % numPts;
+          areaVal += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+        }
+        areaVal = Math.abs(areaVal) / 2.0;
+
+        const txtArea = `ÁREA: ${areaVal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²`;
+        const txtPerim = `PERÍMETRO: ${perimeterDisplay.innerText}`;
+
+        ctx.save();
+        ctx.font = '700 13px "JetBrains Mono", monospace';
+        const wBox = Math.max(ctx.measureText(txtArea).width, ctx.measureText(txtPerim).width) + 24;
+        const hBox = 44;
+
+        ctx.fillStyle = colors.dimensionBg;
+        ctx.fillRect(sC.sx - wBox / 2, sC.sy - hBox / 2, wBox, hBox);
+
+        ctx.strokeStyle = colors.dimensionLine;
+        ctx.lineWidth = 1.4;
+        ctx.strokeRect(sC.sx - wBox / 2, sC.sy - hBox / 2, wBox, hBox);
+
+        ctx.fillStyle = colors.textMain;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(txtArea, sC.sx, sC.sy - 8);
+
+        ctx.font = '600 10px "Space Grotesk", sans-serif';
+        ctx.fillStyle = colors.dimensionLine;
+        ctx.fillText(txtPerim, sC.sx, sC.sy + 10);
+        ctx.restore();
+      }
+
+      // 4.6 DIBUJAR ALTIMETRÍA, PENDIENTE Y CHIPOTE/LOMA CENTRAL
+      if (capasVisibles.altimetria && pts.length >= 3) {
+        const cotaBaja = parseFloat(document.getElementById('altCotaBaja')?.value) || 0;
+        const cotaAlta = parseFloat(document.getElementById('altCotaAlta')?.value) || 1.4;
+        const hChipote = parseFloat(document.getElementById('chipoteAltura')?.value) || 1.8;
+        const diamChipote = parseFloat(document.getElementById('chipoteDiametro')?.value) || 8.0;
+        const tieneChipote = document.getElementById('chkActivarChipote') ? document.getElementById('chkActivarChipote').checked : true;
+
+        // 1. Dibujar el Promontorio / "Chipote" en el centro
+        if (tieneChipote) {
+          let centroideX = 0, centroideY = 0;
+          pts.forEach(p => { centroideX += p.x; centroideY += p.y; });
+          centroideX /= numPts;
+          centroideY /= numPts;
+
+          const sC = toScreen({ x: centroideX, y: centroideY });
+          const radioPx = Math.max(16, (diamChipote / 2) * escalaFinal);
+          const yOffChipote = sC.sy - 38;
+
+          ctx.save();
+          // Curvas de nivel concéntricas del montículo
+          // Anillo 1 (base):
+          ctx.beginPath();
+          ctx.arc(sC.sx, yOffChipote, radioPx, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 183, 3, 0.08)';
+          ctx.fill();
+          ctx.strokeStyle = '#ffb703';
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 3]);
+          ctx.stroke();
+
+          // Anillo 2 (medio):
+          ctx.beginPath();
+          ctx.arc(sC.sx, yOffChipote, radioPx * 0.55, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 183, 3, 0.15)';
+          ctx.fill();
+          ctx.strokeStyle = '#ffb703';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([]);
+          ctx.stroke();
+
+          // Cima / Pico del montículo:
+          ctx.beginPath();
+          ctx.arc(sC.sx, yOffChipote, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#ef4444';
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Etiqueta del chipote
+          const volEst = ((Math.PI * Math.pow(diamChipote / 2, 2) * hChipote) / 2).toFixed(1);
+          const txtLoma = `⛰️ LOMA/CHIPOTE: +${hChipote.toFixed(2)}m (Vol: ${volEst} m³)`;
+          ctx.font = '700 11px "JetBrains Mono", monospace';
+          const twLoma = ctx.measureText(txtLoma).width;
+
+          ctx.fillStyle = colors.dimensionBg;
+          ctx.fillRect(sC.sx - twLoma / 2 - 6, yOffChipote - radioPx - 18, twLoma + 12, 20);
+          ctx.strokeStyle = '#ffb703';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(sC.sx - twLoma / 2 - 6, yOffChipote - radioPx - 18, twLoma + 12, 20);
+
+          ctx.fillStyle = '#ffb703';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(txtLoma, sC.sx, yOffChipote - radioPx - 8);
+
+          ctx.restore();
+        }
+
+        // 2. Flecha de Pendiente Natural del Terreno
+        const sP1 = toScreen(pts[0]);
+        const sP2 = toScreen(pts[1]);
+        const pMidX = (sP1.sx + sP2.sx) / 2;
+        const pMidY = (sP1.sy + sP2.sy) / 2;
+
+        const desnivel = Math.max(0, cotaAlta - cotaBaja);
+        const pendienteVal = document.getElementById('altPendientePorc') ? document.getElementById('altPendientePorc').innerText : "4.20 %";
+
+        ctx.save();
+        ctx.font = '600 10px "Space Grotesk", sans-serif';
+        const txtPendiente = `⬇️ PENDIENTE NATURAL: ${pendienteVal} (Desnivel: ${desnivel.toFixed(2)}m)`;
+        const twPend = ctx.measureText(txtPendiente).width;
+
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+        ctx.fillRect(pMidX - twPend / 2 - 6, pMidY - 32, twPend + 12, 18);
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(pMidX - twPend / 2 - 6, pMidY - 32, twPend + 12, 18);
+
+        ctx.fillStyle = '#10b981';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(txtPendiente, pMidX, pMidY - 23);
+        ctx.restore();
+      }
+
+      // 4.7 DIBUJAR LÍNEA DE SUBDIVISIÓN DE LOTES (FRACCIONAMIENTO)
+      const chkSubdiv = document.getElementById('chkActivarSubdivision');
+      if (chkSubdiv && chkSubdiv.checked && pts.length >= 4) {
+        const i1 = (parseInt(document.getElementById('selSubdivV1')?.value) || 1) - 1;
+        const i2 = (parseInt(document.getElementById('selSubdivV2')?.value) || 3) - 1;
+        if (i1 >= 0 && i2 >= 0 && i1 < pts.length && i2 < pts.length && i1 !== i2) {
+          const s1 = toScreen(pts[i1]);
+          const s2 = toScreen(pts[i2]);
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(s1.sx, s1.sy);
+          ctx.lineTo(s2.sx, s2.sy);
+          ctx.strokeStyle = '#a855f7';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([6, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Etiqueta en el centro de la división
+          const midX = (s1.sx + s2.sx) / 2;
+          const midY = (s1.sy + s2.sy) / 2;
+          const distDiv = Math.hypot(pts[i2].x - pts[i1].x, pts[i2].y - pts[i1].y);
+          const txtDiv = `✂️ LÍNEA DIVISORIA: ${distDiv.toFixed(2)} m`;
+
+          ctx.font = '700 11px "JetBrains Mono", monospace';
+          const tw = ctx.measureText(txtDiv).width;
+          ctx.fillStyle = '#1e1035';
+          ctx.fillRect(midX - tw / 2 - 6, midY - 12, tw + 12, 24);
+          ctx.strokeStyle = '#a855f7';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(midX - tw / 2 - 6, midY - 12, tw + 12, 24);
+
+          ctx.fillStyle = '#c084fc';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(txtDiv, midX, midY);
+          ctx.restore();
+        }
+      }
+
+      // 5. DIBUJAR VÉRTICES Y ETIQUETAS (V1, V2, V3...)
+      if (capasVisibles.vertices) {
+        pts.forEach((p, idx) => {
+          const s = toScreen(p);
+
+          // Círculo del vértice
+          ctx.beginPath();
+          ctx.arc(s.sx, s.sy, 6, 0, Math.PI * 2);
+          ctx.fillStyle = colors.vertexFill;
+          ctx.fill();
+          ctx.strokeStyle = colors.vertexStroke;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Etiqueta de texto V1
+          ctx.font = '700 12px "Space Grotesk", sans-serif';
+          ctx.fillStyle = colors.vertexLabel;
+          ctx.textAlign = 'left';
+          ctx.fillText(`V${idx + 1}`, s.sx + 10, s.sy - 8);
+
+          // Cota de nivel arquitectónica en cada esquina
+          if (capasVisibles.altimetria) {
+            const cotaBaja = parseFloat(document.getElementById('altCotaBaja')?.value) || 0;
+            const cotaAlta = parseFloat(document.getElementById('altCotaAlta')?.value) || 1.4;
+            const nivelZ = (idx === 0) ? cotaBaja : (cotaBaja + (cotaAlta - cotaBaja) * (idx / Math.max(1, pts.length - 1)));
+            ctx.font = '600 10px "JetBrains Mono", monospace';
+            ctx.fillStyle = '#10b981';
+            ctx.fillText(`⌖ N+${nivelZ.toFixed(2)}m`, s.sx + 10, s.sy + 8);
+          }
+        });
+      }
+
+      // 6. DIBUJAR ROSA DE LOS VIENTOS (NORTE ARQUITECTÓNICO)
+      if (capasVisibles.norte) {
+        dibujarRosaDeLosVientos(w - 55, 65, colors);
+      }
+
+      // 7. DIBUJAR ESCALA GRÁFICA MÉTRICA
+      if (capasVisibles.escala) {
+        dibujarEscalaGrafica(30, h - 35, escalaFinal, colors);
+      }
+    }
+
+    function dibujarMallaArquitectonica(w, h, escala, colors) {
+      // Determinar espaciado métrico de la cuadrícula (1m, 5m, 10m, 20m, 50m) según el zoom
+      let pasoMetros = 5;
+      if (escala * 1 > 40) pasoMetros = 1;
+      else if (escala * 5 > 40) pasoMetros = 5;
+      else if (escala * 10 > 40) pasoMetros = 10;
+      else if (escala * 25 > 40) pasoMetros = 25;
+      else pasoMetros = 50;
+
+      const pasoPixels = pasoMetros * escala;
+
+      ctx.save();
+      ctx.strokeStyle = colors.gridSub;
+      ctx.lineWidth = 1.0;
+      ctx.setLineDash([2, 4]);
+
+      let startX = ((w / 2 + panX) % pasoPixels + pasoPixels) % pasoPixels;
+      while (startX > 0) startX -= pasoPixels;
+      for (let x = startX; x < w; x += pasoPixels) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+
+      let startY = ((h / 2 + panY) % pasoPixels + pasoPixels) % pasoPixels;
+      while (startY > 0) startY -= pasoPixels;
+      for (let y = startY; y < h; y += pasoPixels) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function dibujarRosaDeLosVientos(cx, cy, colors) {
+      ctx.save();
+      const r = 24;
+
+      // Círculo exterior tenue
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = colors.gridLine;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Aguja Norte (Relleno izquierda)
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx - 6, cy);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
+      ctx.fillStyle = colors.northNeedle;
+      ctx.fill();
+
+      // Aguja Norte (Relleno derecha sombreado)
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx + 6, cy);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
+      ctx.fillStyle = colors.gridLine;
+      ctx.fill();
+
+      // Aguja Sur
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + r - 6);
+      ctx.lineTo(cx - 5, cy);
+      ctx.lineTo(cx + 5, cy);
+      ctx.closePath();
+      ctx.fillStyle = colors.gridLine;
+      ctx.fill();
+
+      // Letra N
+      ctx.font = '700 13px "Space Grotesk", sans-serif';
+      ctx.fillStyle = colors.textMain;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText("N", cx, cy - r - 4);
+
+      ctx.restore();
+    }
+
+    function dibujarEscalaGrafica(x, y, escala, colors) {
+      ctx.save();
+
+      // Escala gráfica de 10m o 20m según zoom
+      let metrosBarra = 10;
+      let lenPx = metrosBarra * escala;
+      if (lenPx < 40) {
+        metrosBarra = 50;
+        lenPx = metrosBarra * escala;
+      } else if (lenPx > 180) {
+        metrosBarra = 5;
+        lenPx = metrosBarra * escala;
+      }
+
+      const hBarra = 6;
+
+      ctx.fillStyle = colors.scaleBar;
+      ctx.fillRect(x, y, lenPx / 2, hBarra);
+
+      ctx.strokeStyle = colors.scaleBar;
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(x, y, lenPx, hBarra);
+
+      ctx.font = '600 10px "JetBrains Mono", monospace';
+      ctx.fillStyle = colors.scaleBar;
+      ctx.textAlign = 'left';
+      ctx.fillText("0", x, y - 4);
+      ctx.textAlign = 'center';
+      ctx.fillText(`${(metrosBarra / 2)}m`, x + lenPx / 2, y - 4);
+      ctx.textAlign = 'right';
+      ctx.fillText(`${metrosBarra}m`, x + lenPx, y - 4);
+
+      ctx.restore();
+    }
+
+    /* =====================================================================
+       INTERACCIÓN: ZOOM, PAN Y MODO DIBUJO MANUAL
+       ===================================================================== */
+    function zoomIn() {
+      zoomLevel *= 1.25;
+      redibujar();
+    }
+
+    function zoomOut() {
+      zoomLevel /= 1.25;
+      redibujar();
+    }
+
+    function centrarPlano() {
+      panX = 0;
+      panY = 0;
+      zoomLevel = 1.0;
+      redibujar();
+    }
+
+    function toggleModoDibujo() {
+      modoDibujoManual = !modoDibujoManual;
+      const btn = document.getElementById('btnModoDibujo');
+      btn.classList.toggle('active', modoDibujoManual);
+      const hint = document.getElementById('canvasHint');
+      if (modoDibujoManual) {
+        hint.innerHTML = `<span>✏️ <b>Modo Manual Activo:</b> Haz clic en el plano para colocar un nuevo vértice.</span>`;
+        canvas.style.cursor = 'pointer';
+      } else {
+        hint.innerHTML = `<span>💡 Consejo: Arrastra para mover el plano, o activa <b>✏️ Modo Manual</b> para marcar vértices con un toque.</span>`;
+        canvas.style.cursor = 'crosshair';
+      }
+    }
+
+    // Eventos de Mouse y Touch en el Canvas
+    canvas.addEventListener('mousedown', (e) => {
+      if (modoDibujoManual) {
+        agregarVerticeEnPantalla(e.offsetX, e.offsetY);
+        return;
+      }
+      isDragging = true;
+      dragStartX = e.clientX - panX;
+      dragStartY = e.clientY - panY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      panX = e.clientX - dragStartX;
+      panY = e.clientY - dragStartY;
+      redibujar();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        zoomLevel *= 1.1;
+      } else {
+        zoomLevel /= 1.1;
+      }
+      redibujar();
+    }, { passive: false });
+
+    // Soporte Touch para móviles y tablets
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const offsetX = touch.clientX - rect.left;
+        const offsetY = touch.clientY - rect.top;
+
+        if (modoDibujoManual) {
+          agregarVerticeEnPantalla(offsetX, offsetY);
+          return;
+        }
+
+        isDragging = true;
+        dragStartX = touch.clientX - panX;
+        dragStartY = touch.clientY - panY;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (isDragging && e.touches.length === 1) {
+        const touch = e.touches[0];
+        panX = touch.clientX - dragStartX;
+        panY = touch.clientY - dragStartY;
+        redibujar();
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+      isDragging = false;
+    });
+
+    // Convierte coordenadas de píxel de pantalla de vuelta a Lat/Lon para agregar punto manual
+    function agregarVerticeEnPantalla(px, py) {
+      const rect = canvasWrapper.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+
+      const pts = proyectarAMetros(vertices);
+      let minX = -10, maxX = 10, minY = -10, maxY = 10;
+      if (pts.length > 0) {
+        minX = Math.min(...pts.map(p => p.x));
+        maxX = Math.max(...pts.map(p => p.x));
+        minY = Math.min(...pts.map(p => p.y));
+        maxY = Math.max(...pts.map(p => p.y));
+      }
+      const rangoX = Math.max(maxX - minX, 10);
+      const rangoY = Math.max(maxY - minY, 10);
+      const padding = 70;
+      const escalaBase = Math.min((w - padding * 2) / rangoX, (h - padding * 2) / rangoY);
+      const escalaFinal = escalaBase * zoomLevel;
+      const centroX = (minX + maxX) / 2;
+      const centroY = (minY + maxY) / 2;
+
+      // Invertir transformación a metros
+      const metroX = centroX + (px - (w / 2) - panX) / escalaFinal;
+      const metroY = centroY - (py - (h / 2) - panY) / escalaFinal;
+
+      // Invertir metros a Lat/Lon WGS84
+      const latRef = (vertices.length > 0 ? vertices[0].lat : 25.686614) * (Math.PI / 180);
+      const lonRef = (vertices.length > 0 ? vertices[0].lon : -100.316112) * (Math.PI / 180);
+      const R = 6378137.0;
+
+      const deltaLat = metroY / R;
+      const deltaLon = metroX / (R * Math.cos(latRef));
+
+      const nuevaLat = (latRef + deltaLat) * (180 / Math.PI);
+      const nuevaLon = (lonRef + deltaLon) * (180 / Math.PI);
+
+      vertices.push({
+        lat: nuevaLat,
+        lon: nuevaLon,
+        acc: 1.0,
+        elev: 0,
+        timestamp: new Date().toLocaleTimeString()
+      });
+
+      feedbackSonoro();
+      actualizarCalculos();
+    }
+
+    function invertirSentidoPoligono() {
+      if (vertices.length < 3) return;
+      vertices.reverse();
+      actualizarCalculos();
+      alert("Sentido de recorrido del polígono invertido.");
+    }
+
+    /* =====================================================================
+       PLANTILLAS DE EJEMPLO DEMO
+       ===================================================================== */
+    function cargarPlantillaDemo(tipo) {
+      cerrarModal('modalEjemplos');
+      const baseLat = 25.686614;
+      const baseLon = -100.316112;
+
+      // Función auxiliar para generar Lat/Lon desde desplazamientos métricos (dx, dy en metros)
+      const metroToGeo = (dx, dy) => {
+        const R = 6378137.0;
+        const latRad = baseLat * (Math.PI / 180);
+        const lonRad = baseLon * (Math.PI / 180);
+        const deltaLat = dy / R;
+        const deltaLon = dx / (R * Math.cos(latRad));
+        return {
+          lat: (latRad + deltaLat) * (180 / Math.PI),
+          lon: (lonRad + deltaLon) * (180 / Math.PI),
+          acc: 0.8,
+          elev: 540,
+          timestamp: new Date().toLocaleTimeString()
+        };
+      };
+
+      if (tipo === 'urbano') {
+        // Lote 12x25m = 300 m²
+        vertices = [
+          metroToGeo(0, 0),
+          metroToGeo(12, 0),
+          metroToGeo(12, 25),
+          metroToGeo(0, 25)
+        ];
+        document.getElementById('cfgProyecto').value = "Lote Residencial Urbano 12x25";
+      } else if (tipo === 'irregular') {
+        // Terreno campestre de 5 lados
+        vertices = [
+          metroToGeo(0, 0),
+          metroToGeo(32.4, 4.8),
+          metroToGeo(41.2, 28.6),
+          metroToGeo(15.8, 36.4),
+          metroToGeo(-6.2, 18.2)
+        ];
+        document.getElementById('cfgProyecto').value = "Terreno Campestre Los Álamos";
+      } else if (tipo === 'enL') {
+        // Polígono en forma de 'L' de 6 lados
+        vertices = [
+          metroToGeo(0, 0),
+          metroToGeo(24, 0),
+          metroToGeo(24, 15),
+          metroToGeo(12, 15),
+          metroToGeo(12, 30),
+          metroToGeo(0, 30)
+        ];
+        document.getElementById('cfgProyecto').value = "Predio en Escuadra (Forma L)";
+      } else if (tipo === 'rancho') {
+        // Gran polígono de 2.85 ha
+        vertices = [
+          metroToGeo(0, 0),
+          metroToGeo(180, 25),
+          metroToGeo(210, 160),
+          metroToGeo(75, 195),
+          metroToGeo(-30, 90)
+        ];
+        document.getElementById('cfgProyecto').value = "Parcela Agrícola San Isidro";
+      }
+
+      actualizarCalculos();
+      centrarPlano();
+    }
+
+    /* =====================================================================
+       EXPORTACIÓN: ALTA RESOLUCIÓN (PNG), DXF (AUTOCAD), KML, GEOJSON, CSV
+       ===================================================================== */
+
+    // Exportar Imagen HD con Membrete y Cuadro de Construcción Topográfico
+    function exportarPlanoImagenHD() {
+      cerrarModal('modalExportar');
+      if (vertices.length < 2) {
+        alert("Agrega al menos 2 vértices para exportar el plano.");
+        return;
+      }
+
+      const anchoHD = 2400;
+      const altoHD = 1600;
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = anchoHD;
+      offCanvas.height = altoHD;
+      const hCtx = offCanvas.getContext('2d');
+
+      // Fondo estilo papel técnico blanco o blueprint
+      const esBlueprint = (canvasTheme === 'blueprint');
+      hCtx.fillStyle = esBlueprint ? '#071f3d' : '#ffffff';
+      hCtx.fillRect(0, 0, anchoHD, altoHD);
+
+      const colorBorde = esBlueprint ? '#38bdf8' : '#0f172a';
+      const colorTexto = esBlueprint ? '#ffffff' : '#0f172a';
+      const colorSub = esBlueprint ? '#94a3b8' : '#64748b';
+
+      // 1. MARCO PERIMETRAL TIPO PLANO ARQUITECTÓNICO OFICIAL
+      hCtx.lineWidth = 6;
+      hCtx.strokeStyle = colorBorde;
+      hCtx.strokeRect(30, 30, anchoHD - 60, altoHD - 60);
+
+      hCtx.lineWidth = 1.5;
+      hCtx.strokeRect(36, 36, anchoHD - 72, altoHD - 72);
+
+      // 2. MEMBRETE INFERIOR PROFESIONAL
+      const hMembrete = 220;
+      const yMembrete = altoHD - 30 - hMembrete;
+      hCtx.strokeRect(36, yMembrete, anchoHD - 72, hMembrete);
+
+      // Divisiones del membrete
+      const col1 = 650;
+      const col2 = 1350;
+      const col3 = 1950;
+
+      hCtx.beginPath();
+      hCtx.moveTo(col1, yMembrete); hCtx.lineTo(col1, altoHD - 30);
+      hCtx.moveTo(col2, yMembrete); hCtx.lineTo(col2, altoHD - 30);
+      hCtx.moveTo(col3, yMembrete); hCtx.lineTo(col3, altoHD - 30);
+      hCtx.stroke();
+
+      // Contenido Membrete: Columna 1
+      hCtx.fillStyle = colorTexto;
+      hCtx.font = '700 28px "Space Grotesk", sans-serif';
+      hCtx.fillText(document.getElementById('cfgProyecto').value || "PLANO TOPOGRÁFICO", 55, yMembrete + 45);
+
+      hCtx.font = '500 18px "Space Grotesk", sans-serif';
+      hCtx.fillStyle = colorSub;
+      hCtx.fillText(`PROPIETARIO: ${document.getElementById('cfgPropietario').value || "--"}`, 55, yMembrete + 85);
+      hCtx.fillText(`UBICACIÓN: ${document.getElementById('cfgUbicacion').value || "--"}`, 55, yMembrete + 120);
+      hCtx.fillText(`FECHA: ${new Date().toLocaleDateString('es-MX')} | SISTEMA: WGS84 GPS`, 55, yMembrete + 155);
+
+      // Contenido Membrete: Columna 2 (Superficie y Perímetro)
+      hCtx.fillStyle = colorBorde;
+      hCtx.font = '700 36px "Space Grotesk", sans-serif';
+      hCtx.fillText(`SUPERFICIE: ${areaDisplay.innerText}`, col1 + 30, yMembrete + 60);
+
+      hCtx.font = '600 24px "Space Grotesk", sans-serif';
+      hCtx.fillStyle = colorTexto;
+      hCtx.fillText(`PERÍMETRO TOTAL: ${perimeterDisplay.innerText}`, col1 + 30, yMembrete + 115);
+      hCtx.fillText(`HECTÁREAS: ${areaHaDisplay.innerText}`, col1 + 30, yMembrete + 160);
+
+      // Contenido Membrete: Columna 3 (Clave, Altimetría y Responsable)
+      hCtx.font = '500 18px "Space Grotesk", sans-serif';
+      hCtx.fillStyle = colorSub;
+      hCtx.fillText(`CLAVE: ${document.getElementById('cfgClave').value}`, col2 + 30, yMembrete + 45);
+      hCtx.fillText(`LEVANTÓ: ${document.getElementById('cfgTopografo').value}`, col2 + 30, yMembrete + 85);
+      const volCutTxt = document.getElementById('chipoteVolumen') ? document.getElementById('chipoteVolumen').innerText : "--";
+      const desnivTxt = document.getElementById('altDesnivelTotal') ? document.getElementById('altDesnivelTotal').innerText : "--";
+      hCtx.fillText(`DESNIVEL: ${desnivTxt} | CORTE EST: ${volCutTxt}`, col2 + 30, yMembrete + 125);
+      hCtx.fillText(`VÉRTICES: ${vertices.length} PUNTOS`, col2 + 30, yMembrete + 160);
+
+      // Contenido Membrete: Columna 4 (Sello de Validación)
+      hCtx.fillStyle = colorBorde;
+      hCtx.font = '700 22px "Space Grotesk", sans-serif';
+      hCtx.fillText("TOPÓGRAFO PRO GPS", col3 + 30, yMembrete + 55);
+      hCtx.font = '500 15px "JetBrains Mono", monospace';
+      hCtx.fillStyle = colorSub;
+      hCtx.fillText("CROQUIS ARQUITECTÓNICO", col3 + 30, yMembrete + 90);
+      hCtx.fillText("DOCUMENTO TÉCNICO", col3 + 30, yMembrete + 125);
+
+      // 3. DIBUJAR POLÍGONO EN ÁREA PRINCIPAL
+      const anchoPlano = anchoHD - 120;
+      const altoPlano = yMembrete - 60;
+      const pts = proyectarAMetros(vertices);
+
+      let minX = Math.min(...pts.map(p => p.x));
+      let maxX = Math.max(...pts.map(p => p.x));
+      let minY = Math.min(...pts.map(p => p.y));
+      let maxY = Math.max(...pts.map(p => p.y));
+      let rX = Math.max(maxX - minX, 10);
+      let rY = Math.max(maxY - minY, 10);
+
+      const escalaHD = Math.min((anchoPlano - 250) / rX, (altoPlano - 250) / rY);
+      const cX = (minX + maxX) / 2;
+      const cY = (minY + maxY) / 2;
+
+      const toHD = (p) => ({
+        sx: (anchoHD / 2) + (p.x - cX) * escalaHD,
+        sy: (altoPlano / 2 + 50) - (p.y - cY) * escalaHD
+      });
+
+      // Polígono HD
+      hCtx.beginPath();
+      const p0 = toHD(pts[0]);
+      hCtx.moveTo(p0.sx, p0.sy);
+      for (let i = 1; i < pts.length; i++) {
+        const pScr = toHD(pts[i]);
+        hCtx.lineTo(pScr.sx, pScr.sy);
+      }
+      if (pts.length >= 3) {
+        hCtx.closePath();
+        hCtx.fillStyle = esBlueprint ? 'rgba(56, 189, 248, 0.15)' : 'rgba(2, 132, 199, 0.08)';
+        hCtx.fill();
+      }
+      hCtx.lineWidth = 4;
+      hCtx.strokeStyle = esBlueprint ? '#ffffff' : '#0f172a';
+      hCtx.stroke();
+
+      // Cotas HD con medidas legibles
+      for (let i = 0; i < pts.length; i++) {
+        if (i === pts.length - 1 && pts.length < 3) break;
+        const pA = pts[i];
+        const pB = pts[(i + 1) % pts.length];
+        const sA = toHD(pA);
+        const sB = toHD(pB);
+
+        const dx = sB.sx - sA.sx;
+        const dy = sB.sy - sA.sy;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+
+        const distReal = Math.hypot(pB.x - pA.x, pB.y - pA.y);
+        const midX = (sA.sx + sB.sx) / 2 + nx * 38;
+        const midY = (sA.sy + sB.sy) / 2 + ny * 38;
+
+        hCtx.font = '700 20px "JetBrains Mono", monospace';
+        const txt = `${distReal.toFixed(2)} m`;
+        const tw = hCtx.measureText(txt).width;
+
+        hCtx.fillStyle = esBlueprint ? '#071f3d' : '#ffffff';
+        hCtx.fillRect(midX - tw / 2 - 6, midY - 14, tw + 12, 28);
+        hCtx.strokeStyle = colorBorde;
+        hCtx.lineWidth = 1.5;
+        hCtx.strokeRect(midX - tw / 2 - 6, midY - 14, tw + 12, 28);
+
+        hCtx.fillStyle = colorTexto;
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText(txt, midX, midY);
+      }
+
+      // Vértices HD
+      pts.forEach((p, idx) => {
+        const s = toHD(p);
+        hCtx.beginPath();
+        hCtx.arc(s.sx, s.sy, 10, 0, Math.PI * 2);
+        hCtx.fillStyle = colorBorde;
+        hCtx.fill();
+        hCtx.strokeStyle = '#fff';
+        hCtx.lineWidth = 3;
+        hCtx.stroke();
+
+        hCtx.font = '700 22px "Space Grotesk", sans-serif';
+        hCtx.fillStyle = colorTexto;
+        hCtx.textAlign = 'left';
+        hCtx.fillText(`V${idx + 1}`, s.sx + 16, s.sy - 12);
+      });
+
+      // Relieve y Chipote en Plano HD
+      const tieneChipoteHD = document.getElementById('chkActivarChipote') ? document.getElementById('chkActivarChipote').checked : true;
+      if (tieneChipoteHD && pts.length >= 3) {
+        let cxM = 0, cyM = 0;
+        pts.forEach(p => { cxM += p.x; cyM += p.y; });
+        cxM /= pts.length;
+        cyM /= pts.length;
+
+        const sC_HD = toHD({ x: cxM, y: cyM });
+        const diamChipote = parseFloat(document.getElementById('chipoteDiametro')?.value) || 8.0;
+        const hChipote = parseFloat(document.getElementById('chipoteAltura')?.value) || 1.8;
+        const radioPxHD = Math.max(30, (diamChipote / 2) * escalaHD);
+        const yOffHD = sC_HD.sy - 60;
+
+        hCtx.save();
+        hCtx.beginPath();
+        hCtx.arc(sC_HD.sx, yOffHD, radioPxHD, 0, Math.PI * 2);
+        hCtx.strokeStyle = '#ffb703';
+        hCtx.lineWidth = 2.5;
+        hCtx.setLineDash([6, 6]);
+        hCtx.stroke();
+
+        hCtx.beginPath();
+        hCtx.arc(sC_HD.sx, yOffHD, radioPxHD * 0.55, 0, Math.PI * 2);
+        hCtx.lineWidth = 3;
+        hCtx.setLineDash([]);
+        hCtx.stroke();
+
+        hCtx.font = '700 20px "JetBrains Mono", monospace';
+        const volEstHD = ((Math.PI * Math.pow(diamChipote / 2, 2) * hChipote) / 2).toFixed(1);
+        const txtChipoteHD = `⛰️ PROMONTORIO A REBAJAR: +${hChipote.toFixed(2)}m (Volumen: ${volEstHD} m³)`;
+        const twChip = hCtx.measureText(txtChipoteHD).width;
+
+        hCtx.fillStyle = esBlueprint ? '#071f3d' : '#ffffff';
+        hCtx.fillRect(sC_HD.sx - twChip / 2 - 10, yOffHD - radioPxHD - 34, twChip + 20, 36);
+        hCtx.strokeStyle = '#ffb703';
+        hCtx.lineWidth = 2;
+        hCtx.strokeRect(sC_HD.sx - twChip / 2 - 10, yOffHD - radioPxHD - 34, twChip + 20, 36);
+
+        hCtx.fillStyle = '#ffb703';
+        hCtx.textAlign = 'center';
+        hCtx.textBaseline = 'middle';
+        hCtx.fillText(txtChipoteHD, sC_HD.sx, yOffHD - radioPxHD - 16);
+        hCtx.restore();
+      }
+
+      // Descargar archivo PNG
+      const link = document.createElement('a');
+      link.download = `Plano_Arquitectonico_${document.getElementById('cfgProyecto').value.replace(/\s+/g, '_')}.png`;
+      link.href = offCanvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Exportar Archivo DXF compatible con AutoCAD
+    function exportarDXF() {
+      cerrarModal('modalExportar');
+      if (vertices.length < 2) {
+        alert("Se necesitan al menos 2 vértices para exportar en DXF.");
+        return;
+      }
+
+      const pts = proyectarAMetros(vertices);
+
+      let dxf = `0
+SECTION
+2
+HEADER
+9
+$ACADVER
+1
+AC1009
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+`;
+
+      // Entidad POLYLINE
+      dxf += `0
+POLYLINE
+8
+TERRENO
+66
+1
+70
+${pts.length >= 3 ? 1 : 0}
+`;
+
+      pts.forEach(p => {
+        dxf += `0
+VERTEX
+8
+TERRENO
+10
+${p.x.toFixed(4)}
+20
+${p.y.toFixed(4)}
+30
+0.0
+`;
+      });
+
+      dxf += `0
+SEQEND
+`;
+
+      // Textos de Vértices y Cotas
+      pts.forEach((p, idx) => {
+        dxf += `0
+TEXT
+8
+VERTICES
+10
+${(p.x + 0.5).toFixed(4)}
+20
+${(p.y + 0.5).toFixed(4)}
+30
+0.0
+40
+0.8
+1
+V${idx + 1}
+`;
+      });
+
+      // Cotas como textos en los tramos
+      for (let i = 0; i < pts.length; i++) {
+        if (i === pts.length - 1 && pts.length < 3) break;
+        const pA = pts[i];
+        const pB = pts[(i + 1) % pts.length];
+        const dist = Math.hypot(pB.x - pA.x, pB.y - pA.y);
+        const mx = (pA.x + pB.x) / 2;
+        const my = (pA.y + pB.y) / 2;
+
+        dxf += `0
+TEXT
+8
+COTAS
+10
+${mx.toFixed(4)}
+20
+${my.toFixed(4)}
+30
+0.0
+40
+0.6
+1
+${dist.toFixed(2)}m
+`;
+      }
+
+      dxf += `0
+ENDSEC
+0
+EOF
+`;
+
+      descargarArchivoTexto(dxf, `Terreno_${document.getElementById('cfgProyecto').value.replace(/\s+/g, '_')}.dxf`, "application/dxf");
+    }
+
+    // Exportar Archivo KML para Google Earth
+    function exportarKML() {
+      cerrarModal('modalExportar');
+      if (vertices.length < 3) {
+        alert("Se requieren al menos 3 vértices para generar un polígono KML para Google Earth.");
+        return;
+      }
+
+      let coordStr = "";
+      vertices.forEach(v => {
+        coordStr += `${v.lon},${v.lat},${v.elev || 0} \n`;
+      });
+      // Cerrar el polígono repitiendo el primer vértice
+      coordStr += `${vertices[0].lon},${vertices[0].lat},${vertices[0].elev || 0} \n`;
+
+      const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${document.getElementById('cfgProyecto').value}</name>
+    <description>Levantamiento con Topógrafo Pro GPS. Superficie: ${areaDisplay.innerText}</description>
+    <Style id="polyStyle">
+      <LineStyle>
+        <color>ff00e5ff</color>
+        <width>3</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>7f00e5ff</color>
+      </PolyStyle>
+    </Style>
+    <Placemark>
+      <name>${document.getElementById('cfgProyecto').value}</name>
+      <styleUrl>#polyStyle</styleUrl>
+      <Polygon>
+        <extrude>1</extrude>
+        <altitudeMode>clampToGround</altitudeMode>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+${coordStr}
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>`;
+
+      descargarArchivoTexto(kml, `Poligono_${document.getElementById('cfgProyecto').value.replace(/\s+/g, '_')}.kml`, "application/vnd.google-earth.kml+xml");
+    }
+
+    // Exportar GeoJSON estándar
+    function exportarGeoJSON() {
+      cerrarModal('modalExportar');
+      if (vertices.length < 3) {
+        alert("Se requieren al menos 3 vértices para exportar GeoJSON.");
+        return;
+      }
+
+      const coords = vertices.map(v => [v.lon, v.lat]);
+      coords.push([vertices[0].lon, vertices[0].lat]); // Cierre de anillo
+
+      const geojson = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {
+              proyecto: document.getElementById('cfgProyecto').value,
+              propietario: document.getElementById('cfgPropietario').value,
+              area_m2: parseFloat(areaDisplay.innerText.replace(/[^\d.]/g, '')),
+              perimetro_m: parseFloat(perimeterDisplay.innerText.replace(/[^\d.]/g, '')),
+              fecha: new Date().toISOString()
+            },
+            geometry: {
+              type: "Polygon",
+              coordinates: [coords]
+            }
+          }
+        ]
+      };
+
+      descargarArchivoTexto(JSON.stringify(geojson, null, 2), `Predio_${document.getElementById('cfgProyecto').value.replace(/\s+/g, '_')}.geojson`, "application/geo+json");
+    }
+
+    // Exportar CSV con Cuadro de Construcción Topográfico
+    function exportarCSV() {
+      cerrarModal('modalExportar');
+      if (vertices.length === 0) return;
+
+      const pts = proyectarAMetros(vertices);
+      let csv = "Vertice,Latitud,Longitud,X_Metros,Y_Metros,Tramo,Distancia_m,Rumbo,Azimut_deg\n";
+
+      for (let i = 0; i < pts.length; i++) {
+        const pA = pts[i];
+        const pB = pts[(i + 1) % pts.length];
+        const dist = (i === pts.length - 1 && pts.length < 3) ? 0 : Math.hypot(pB.x - pA.x, pB.y - pA.y);
+        const az = calcularAzimut(pA, pB);
+        const rumbo = formatearRumbo(az);
+
+        csv += `V${i + 1},${pA.lat.toFixed(6)},${pA.lon.toFixed(6)},${pA.x.toFixed(3)},${pA.y.toFixed(3)},V${i + 1}-V${(i + 1) % pts.length + 1},${dist.toFixed(2)},"${rumbo}",${az.toFixed(2)}\n`;
+      }
+
+      descargarArchivoTexto(csv, `Cuadro_Construccion_${document.getElementById('cfgProyecto').value.replace(/\s+/g, '_')}.csv`, "text/csv;charset=utf-8;");
+    }
+
+    // Exportar Informe Técnico Completo y Dictamen Topográfico (TXT)
+    function exportarInformeTecnicoCompleto() {
+      cerrarModal('modalExportar');
+      if (vertices.length === 0) {
+        alert("No hay datos suficientes para generar el informe.");
+        return;
+      }
+
+      const pts = proyectarAMetros(vertices);
+      const cotaBaja = parseFloat(document.getElementById('altCotaBaja')?.value) || 0;
+      const cotaAlta = parseFloat(document.getElementById('altCotaAlta')?.value) || 1.4;
+      const hChipote = parseFloat(document.getElementById('chipoteAltura')?.value) || 1.8;
+      const diamChipote = parseFloat(document.getElementById('chipoteDiametro')?.value) || 8.0;
+      const desnivel = Math.max(0, cotaAlta - cotaBaja);
+      const pendientePorc = document.getElementById('altPendientePorc') ? document.getElementById('altPendientePorc').innerText : "--";
+      const volCut = document.getElementById('chipoteVolumen') ? document.getElementById('chipoteVolumen').innerText : "--";
+      const volSuelto = document.getElementById('chipoteVolSuelto') ? document.getElementById('chipoteVolSuelto').innerText : "--";
+      const camiones = document.getElementById('chipoteCamiones') ? document.getElementById('chipoteCamiones').innerText : "--";
+
+      let doc = `========================================================================\n`;
+      doc += `         DICTAMEN Y EXPEDIENTE TÉCNICO TOPOGRÁFICO DE PREDIO\n`;
+      doc += `========================================================================\n\n`;
+      doc += `DATOS GENERALES DEL PROYECTO:\n`;
+      doc += `------------------------------------------------------------------------\n`;
+      doc += `• Nombre del Predio:      ${document.getElementById('cfgProyecto')?.value || 'N/A'}\n`;
+      doc += `• Propietario / Titular:   ${document.getElementById('cfgPropietario')?.value || 'N/A'}\n`;
+      doc += `• Ubicación / Municipio:   ${document.getElementById('cfgUbicacion')?.value || 'N/A'}\n`;
+      doc += `• Clave Catastral:         ${document.getElementById('cfgClave')?.value || 'N/A'}\n`;
+      doc += `• Responsable Técnico:     ${document.getElementById('cfgTopografo')?.value || 'Topógrafo Pro GPS'}\n`;
+      doc += `• Fecha de Levantamiento:  ${new Date().toLocaleString('es-MX')}\n`;
+      doc += `• Sistema Geodésico:       WGS84 (GPS Satelital Georreferenciado)\n\n`;
+
+      doc += `RESUMEN DE SUPERFICIE Y VALUACIÓN:\n`;
+      doc += `------------------------------------------------------------------------\n`;
+      doc += `• Superficie Total:        ${areaDisplay.innerText}\n`;
+      doc += `• Superficie en Hectáreas: ${areaHaDisplay.innerText}\n`;
+      doc += `• Perímetro Total:         ${perimeterDisplay.innerText}\n`;
+      doc += `• Número de Vértices:      ${vertices.length} estaciones\n`;
+      doc += `• Valuación Comercial Est: ${document.getElementById('valValorTotal')?.innerText || '$ 0.00'}\n`;
+      doc += `• Presupuesto de Cercado:  ${document.getElementById('valCostoCercaTotal')?.innerText || '$ 0.00'}\n\n`;
+
+      doc += `ALTIMETRÍA, RELIEVE Y MOVIMIENTO DE TIERRAS (BULLDOZER):\n`;
+      doc += `------------------------------------------------------------------------\n`;
+      doc += `• Cota Punto Más Bajo:     +${cotaBaja.toFixed(2)} msnm\n`;
+      doc += `• Cota Punto Más Alto:     +${cotaAlta.toFixed(2)} msnm\n`;
+      doc += `• Desnivel Natural Total:  ${desnivel.toFixed(2)} metros\n`;
+      doc += `• Pendiente Media Natural: ${pendientePorc}\n`;
+      doc += `• Promontorio / Loma:      Altura +${hChipote.toFixed(2)}m | Diámetro Base: ${diamChipote.toFixed(2)}m\n`;
+      doc += `• Volumen de Corte Banco:  ${volCut}\n`;
+      doc += `• Volumen Suelto (+20%):   ${volSuelto}\n`;
+      doc += `• Acarreo de Tierra:       ${camiones} (Camiones de 7 m³)\n\n`;
+
+      doc += `CUADRO DE CONSTRUCCIÓN TOPOGRÁFICO:\n`;
+      doc += `------------------------------------------------------------------------\n`;
+      doc += `VERTICE | LATITUD    | LONGITUD    | X (m)   | Y (m)   | TRAMO   | DISTANCIA | RUMBO\n`;
+      doc += `--------+------------+-------------+---------+---------+---------+-----------+-----------------\n`;
+
+      for (let i = 0; i < pts.length; i++) {
+        const pA = pts[i];
+        const pB = pts[(i + 1) % pts.length];
+        const dist = (i === pts.length - 1 && pts.length < 3) ? 0 : Math.hypot(pB.x - pA.x, pB.y - pA.y);
+        const az = calcularAzimut(pA, pB);
+        const rumbo = formatearRumbo(az);
+        doc += `V${(i+1).toString().padEnd(6)}| ${pA.lat.toFixed(6).padEnd(10)} | ${pA.lon.toFixed(6).padEnd(11)} | ${pA.x.toFixed(2).padEnd(7)} | ${pA.y.toFixed(2).padEnd(7)} | V${i+1}-V${(i+1)%pts.length+1}  | ${dist.toFixed(2).padStart(7)} m | ${rumbo}\n`;
+      }
+
+      doc += `\n`;
+      doc += `MEMORIA DE COLINDANCIAS (NOTARIAL):\n`;
+      doc += `------------------------------------------------------------------------\n`;
+      const txtMemoria = document.getElementById('txtMemoriaDescriptiva')?.value;
+      doc += txtMemoria ? txtMemoria : "No se han definido nombres de colindantes.";
+
+      doc += `\n\n========================================================================\n`;
+      doc += `FIN DEL INFORME TÉCNICO - TOPÓGRAFO PRO GPS & CAD SYSTEM\n`;
+
+      descargarArchivoTexto(doc, `Informe_Tecnico_${document.getElementById('cfgProyecto').value.replace(/\s+/g, '_')}.txt`, "text/plain;charset=utf-8;");
+    }
+
+    // Exportar Respaldo Completo .TOPOMAP (JSON descargable)
+    function exportarArchivoProyectoTOPOMAP() {
+      cerrarModal('modalExportar');
+      const paquete = {
+        version: "2.0",
+        fecha: new Date().toISOString(),
+        proyecto: document.getElementById('cfgProyecto')?.value || "Terreno",
+        propietario: document.getElementById('cfgPropietario')?.value || "",
+        ubicacion: document.getElementById('cfgUbicacion')?.value || "",
+        topografo: document.getElementById('cfgTopografo')?.value || "",
+        clave: document.getElementById('cfgClave')?.value || "",
+        notas: document.getElementById('cfgNotas')?.value || "",
+        precioM2: document.getElementById('valPrecioM2')?.value || 850,
+        costoML: document.getElementById('valCostoMetroLineal')?.value || 420,
+        cotaBaja: document.getElementById('altCotaBaja')?.value || 0,
+        cotaAlta: document.getElementById('altCotaAlta')?.value || 1.4,
+        chipoteAltura: document.getElementById('chipoteAltura')?.value || 1.8,
+        chipoteDiametro: document.getElementById('chipoteDiametro')?.value || 8.0,
+        chipoteActivo: document.getElementById('chkActivarChipote')?.checked ?? true,
+        vertices: vertices,
+        colindantes: colindantesData,
+        fotos: fotosVertices
+      };
+
+      descargarArchivoTexto(JSON.stringify(paquete, null, 2), `${paquete.proyecto.replace(/\s+/g, '_')}.topomap`, "application/json");
+    }
+
+    /* =====================================================================
+       SISTEMA DE GESTIÓN DE LOTES GUARDADOS (LOCALSTORAGE + IMPORTAR/EXPORTAR)
+       ===================================================================== */
+    const STORAGE_KEY_LOTES = "topografo_pro_lotes_guardados";
+
+    function obtenerLotesGuardados() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_LOTES);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function guardarLotesEnStorage(arr) {
+      try {
+        localStorage.setItem(STORAGE_KEY_LOTES, JSON.stringify(arr));
+        actualizarBadgeMisLotes();
+      } catch (e) {
+        console.error("Error guardando en localStorage", e);
+      }
+    }
+
+    function actualizarBadgeMisLotes() {
+      const lotes = obtenerLotesGuardados();
+      const badge = document.getElementById('badgeNumLotes');
+      if (badge) badge.innerText = lotes.length;
+    }
+
+    function abrirModalGuardarLote() {
+      if (vertices.length === 0) {
+        alert("Primero toma medidas o carga un terreno antes de guardarlo.");
+        return;
+      }
+      document.getElementById('saveLoteNombre').value = document.getElementById('cfgProyecto')?.value || "Mi Terreno";
+      document.getElementById('saveLoteNotas').value = document.getElementById('cfgNotas')?.value || "";
+      document.getElementById('saveLotePts').innerText = `${vertices.length} vértices`;
+      document.getElementById('saveLoteArea').innerText = areaDisplay.innerText;
+      document.getElementById('saveLotePerim').innerText = perimeterDisplay.innerText;
+      document.getElementById('modalGuardarLote').classList.add('open');
+    }
+
+    function confirmarGuardarLote() {
+      const nombre = document.getElementById('saveLoteNombre').value.trim();
+      if (!nombre) {
+        alert("Por favor escribe un nombre para identificar el terreno.");
+        return;
+      }
+
+      const nuevoLote = {
+        id: "lote_" + Date.now(),
+        fechaGuardado: new Date().toLocaleString(),
+        nombre: nombre,
+        notas: document.getElementById('saveLoteNotas').value,
+        propietario: document.getElementById('cfgPropietario')?.value || "",
+        ubicacion: document.getElementById('cfgUbicacion')?.value || "",
+        topografo: document.getElementById('cfgTopografo')?.value || "",
+        clave: document.getElementById('cfgClave')?.value || "",
+        precioM2: document.getElementById('valPrecioM2')?.value || 850,
+        costoML: document.getElementById('valCostoMetroLineal')?.value || 420,
+        cotaBaja: document.getElementById('altCotaBaja')?.value || 0,
+        cotaAlta: document.getElementById('altCotaAlta')?.value || 1.4,
+        chipoteAltura: document.getElementById('chipoteAltura')?.value || 1.8,
+        chipoteDiametro: document.getElementById('chipoteDiametro')?.value || 8.0,
+        chipoteActivo: document.getElementById('chkActivarChipote')?.checked ?? true,
+        vertices: JSON.parse(JSON.stringify(vertices)),
+        colindantes: JSON.parse(JSON.stringify(colindantesData)),
+        fotos: JSON.parse(JSON.stringify(fotosVertices)),
+        areaTexto: areaDisplay.innerText,
+        perimTexto: perimeterDisplay.innerText
+      };
+
+      const lotes = obtenerLotesGuardados();
+      // Si ya existe uno con el mismo id o nombre, actualizarlo o agregarlo
+      const existIdx = lotes.findIndex(l => l.nombre.toLowerCase() === nombre.toLowerCase());
+      if (existIdx >= 0) {
+        if (confirm(`Ya existe un lote llamado "${nombre}". ¿Deseas sobreescribirlo?`)) {
+          lotes[existIdx] = nuevoLote;
+        } else {
+          return;
+        }
+      } else {
+        lotes.unshift(nuevoLote);
+      }
+
+      guardarLotesEnStorage(lotes);
+      cerrarModal('modalGuardarLote');
+      alert(`✅ ¡Terreno "${nombre}" guardado con éxito en tu biblioteca!`);
+    }
+
+    function abrirModalMisLotes() {
+      renderizarListaMisTerrenos();
+      document.getElementById('modalMisLotes').classList.add('open');
+    }
+
+    function renderizarListaMisTerrenos() {
+      const container = document.getElementById('listaMisTerrenosContainer');
+      if (!container) return;
+
+      const lotes = obtenerLotesGuardados();
+      if (lotes.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:30px; color:var(--text-muted); background:rgba(0,0,0,0.2); border-radius:10px;">
+            <div style="font-size:2rem; margin-bottom:6px;">📂</div>
+            <b>No tienes terrenos guardados aún.</b><br>
+            <span style="font-size:0.75rem;">Mide un predio con el GPS o Cinta y pulsa el botón verde <b>💾 Guardar Lote</b> arriba.</span>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = "";
+      lotes.forEach((lote, idx) => {
+        const item = document.createElement('div');
+        item.style.cssText = "background:#0f2035; border:1px solid var(--border-color); border-radius:10px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:12px;";
+        item.innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <b style="font-size:0.95rem; color:#fff;">🏡 ${lote.nombre}</b>
+              <span style="font-size:0.68rem; background:rgba(0,229,255,0.15); color:var(--cyan); padding:2px 6px; border-radius:4px;">${lote.vertices.length} Vértices</span>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); display:flex; gap:14px; flex-wrap:wrap;">
+              <span>Superficie: <b style="color:var(--green);">${lote.areaTexto || '--'}</b></span>
+              <span>Perímetro: <b style="color:var(--cyan);">${lote.perimTexto || '--'}</b></span>
+              <span>📅 ${lote.fechaGuardado}</span>
+            </div>
+            ${lote.notas ? `<div style="font-size:0.72rem; color:#94a3b8; font-style:italic;">📝 ${lote.notas}</div>` : ''}
+          </div>
+
+          <div style="display:flex; gap:6px;">
+            <button class="tool-btn active" style="background:var(--cyan); color:#000; font-weight:700;" onclick="cargarLoteSeleccionado('${lote.id}')" title="Cargar este terreno en el plano">
+              📂 Cargar
+            </button>
+            <button class="tool-btn" onclick="descargarLoteIndividual('${lote.id}')" title="Descargar archivo .TOPOMAP">
+              💾 Exportar
+            </button>
+            <button class="tool-btn danger" style="color:var(--red); border-color:rgba(239,68,68,0.4);" onclick="eliminarLoteGuardado('${lote.id}')" title="Eliminar de la memoria">
+              🗑️
+            </button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function cargarLoteSeleccionado(loteId) {
+      const lotes = obtenerLotesGuardados();
+      const lote = lotes.find(l => l.id === loteId);
+      if (!lote) return;
+
+      aplicarDatosLote(lote);
+      cerrarModal('modalMisLotes');
+      alert(`✅ Terreno "${lote.nombre}" cargado con éxito.`);
+    }
+
+    function aplicarDatosLote(lote) {
+      document.getElementById('cfgProyecto').value = lote.nombre || "Terreno";
+      if (document.getElementById('cfgPropietario')) document.getElementById('cfgPropietario').value = lote.propietario || "";
+      if (document.getElementById('cfgUbicacion')) document.getElementById('cfgUbicacion').value = lote.ubicacion || "";
+      if (document.getElementById('cfgTopografo')) document.getElementById('cfgTopografo').value = lote.topografo || "";
+      if (document.getElementById('cfgClave')) document.getElementById('cfgClave').value = lote.clave || "";
+      if (document.getElementById('cfgNotas')) document.getElementById('cfgNotas').value = lote.notas || "";
+
+      if (document.getElementById('valPrecioM2') && lote.precioM2) document.getElementById('valPrecioM2').value = lote.precioM2;
+      if (document.getElementById('valCostoMetroLineal') && lote.costoML) document.getElementById('valCostoMetroLineal').value = lote.costoML;
+
+      if (document.getElementById('altCotaBaja') && lote.cotaBaja !== undefined) document.getElementById('altCotaBaja').value = lote.cotaBaja;
+      if (document.getElementById('altCotaAlta') && lote.cotaAlta !== undefined) document.getElementById('altCotaAlta').value = lote.cotaAlta;
+      if (document.getElementById('chipoteAltura') && lote.chipoteAltura !== undefined) document.getElementById('chipoteAltura').value = lote.chipoteAltura;
+      if (document.getElementById('chipoteDiametro') && lote.chipoteDiametro !== undefined) document.getElementById('chipoteDiametro').value = lote.chipoteDiametro;
+      if (document.getElementById('chkActivarChipote') && lote.chipoteActivo !== undefined) document.getElementById('chkActivarChipote').checked = lote.chipoteActivo;
+
+      vertices = lote.vertices || [];
+      colindantesData = lote.colindantes || {};
+      fotosVertices = lote.fotos || [];
+
+      actualizarCalculos();
+      actualizarGaleriaFotos();
+      centrarPlano();
+    }
+
+    function eliminarLoteGuardado(loteId) {
+      const lotes = obtenerLotesGuardados();
+      const lote = lotes.find(l => l.id === loteId);
+      if (!lote) return;
+
+      if (confirm(`¿Eliminar el terreno "${lote.nombre}" de la memoria?`)) {
+        const filtrados = lotes.filter(l => l.id !== loteId);
+        guardarLotesEnStorage(filtrados);
+        renderizarListaMisTerrenos();
+      }
+    }
+
+    function descargarLoteIndividual(loteId) {
+      const lotes = obtenerLotesGuardados();
+      const lote = lotes.find(l => l.id === loteId);
+      if (!lote) return;
+
+      descargarArchivoTexto(JSON.stringify(lote, null, 2), `${lote.nombre.replace(/\s+/g, '_')}.topomap`, "application/json");
+    }
+
+    function importarArchivoTOPOMAP(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.vertices && Array.isArray(data.vertices)) {
+            aplicarDatosLote(data);
+
+            // También guardarlo en Mis Terrenos si no está
+            const lotes = obtenerLotesGuardados();
+            data.id = data.id || "lote_" + Date.now();
+            data.fechaGuardado = data.fechaGuardado || new Date().toLocaleString();
+            data.nombre = data.nombre || data.proyecto || "Terreno Importado";
+            data.areaTexto = areaDisplay.innerText;
+            data.perimTexto = perimeterDisplay.innerText;
+
+            lotes.unshift(data);
+            guardarLotesEnStorage(lotes);
+
+            cerrarModal('modalMisLotes');
+            alert(`✅ Archivo .TOPOMAP importado y cargado con éxito: "${data.nombre}"`);
+          } else {
+            alert("El archivo no tiene el formato topográfico válido.");
+          }
+        } catch (err) {
+          alert("Error al leer el archivo .TOPOMAP: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Inicializar badge de lotes al cargar
+    setTimeout(actualizarBadgeMisLotes, 300);
+
+    function descargarArchivoTexto(contenido, nombreArchivo, mimeType) {
+      const blob = new Blob([contenido], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombreArchivo;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    /* =====================================================================
+       CONTROL DE MODALES Y TABS
+       ===================================================================== */
+    function cambiarTab(tabId, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      btn.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    function abrirModalEjemplos() {
+      document.getElementById('modalEjemplos').classList.add('open');
+    }
+
+    function abrirModalExportar() {
+      document.getElementById('modalExportar').classList.add('open');
+    }
+
+    function abrirModalManualCoord() {
+      document.getElementById('modalManualCoord').classList.add('open');
+    }
+
+    function cerrarModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    function guardarCoordenadaManual() {
+      const latInput = parseFloat(document.getElementById('manLat').value);
+      const lonInput = parseFloat(document.getElementById('manLon').value);
+      const distInput = parseFloat(document.getElementById('manDist').value);
+      const azInput = parseFloat(document.getElementById('manAzimut').value);
+
+      if (!isNaN(latInput) && !isNaN(lonInput)) {
+        vertices.push({
+          lat: latInput,
+          lon: lonInput,
+          acc: 0.5,
+          elev: 0,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      } else if (!isNaN(distInput) && !isNaN(azInput)) {
+        const ultimo = vertices.length > 0 ? vertices[vertices.length - 1] : { lat: 25.686614, lon: -100.316112 };
+        const azRad = azInput * (Math.PI / 180);
+        const dx = distInput * Math.sin(azRad);
+        const dy = distInput * Math.cos(azRad);
+
+        const R = 6378137.0;
+        const latRad = ultimo.lat * (Math.PI / 180);
+        const deltaLat = dy / R;
+        const deltaLon = dx / (R * Math.cos(latRad));
+
+        vertices.push({
+          lat: (latRad + deltaLat) * (180 / Math.PI),
+          lon: (ultimo.lon * (Math.PI / 180) + deltaLon) * (180 / Math.PI),
+          acc: 0.5,
+          elev: 0,
+          timestamp: new Date().toLocaleTimeString()
+        });
+      } else {
+        alert("Por favor ingresa Latitud/Longitud o Distancia/Azimut.");
+        return;
+      }
+
+      cerrarModal('modalManualCoord');
+      actualizarCalculos();
+      centrarPlano();
+    }
+
+    /* Funciones del Asistente de Cinta Métrica & Diagonales */
+    function abrirModalCintaMetrica() {
+      actualizarAsistenteCinta();
+      document.getElementById('modalCintaMetrica').classList.add('open');
+    }
+
+    function actualizarAsistenteCinta() {
+      const ancho = parseFloat(document.getElementById('cintaAncho').value) || 0;
+      const largo = parseFloat(document.getElementById('cintaLargo').value) || 0;
+
+      const area = ancho * largo;
+      const perim = (ancho + largo) * 2;
+      const diag = Math.hypot(ancho, largo);
+
+      document.getElementById('cintaAreaRes').innerText = `${area.toFixed(2)} m²`;
+      document.getElementById('cintaPerimRes').innerText = `${perim.toFixed(2)} m`;
+      document.getElementById('cintaDiagRes').innerText = `${diag.toFixed(2)} m`;
+      document.getElementById('cintaDiagTip').innerText = `${diag.toFixed(2)} m`;
+    }
+
+    function aplicarTerrenoCinta() {
+      const ancho = parseFloat(document.getElementById('cintaAncho').value) || 0;
+      const largo = parseFloat(document.getElementById('cintaLargo').value) || 0;
+
+      if (ancho <= 0 || largo <= 0) {
+        alert("Por favor ingresa un ancho y un largo válidos mayores a cero.");
+        return;
+      }
+
+      const baseLat = 25.686614;
+      const baseLon = -100.316112;
+      const R = 6378137.0;
+      const latRad = baseLat * (Math.PI / 180);
+      const lonRad = baseLon * (Math.PI / 180);
+
+      const metroToGeo = (dx, dy) => {
+        const deltaLat = dy / R;
+        const deltaLon = dx / (R * Math.cos(latRad));
+        return {
+          lat: (latRad + deltaLat) * (180 / Math.PI),
+          lon: (lonRad + deltaLon) * (180 / Math.PI),
+          acc: 0.1,
+          elev: 0,
+          timestamp: new Date().toLocaleTimeString()
+        };
+      };
+
+      // Generar rectángulo en escuadra perfecta
+      vertices = [
+        metroToGeo(0, 0),
+        metroToGeo(ancho, 0),
+        metroToGeo(ancho, largo),
+        metroToGeo(0, largo)
+      ];
+
+      document.getElementById('cfgProyecto').value = `Terreno Cinta ${ancho}m x ${largo}m`;
+      cerrarModal('modalCintaMetrica');
+      actualizarCalculos();
+      centrarPlano();
+      alert(`✅ Terreno de ${ancho}x${largo}m (${(ancho*largo).toFixed(2)} m²) trazado en el plano con escuadra perfecta.`);
+    }
+
+    function cambiarSubTabCinta(tab) {
+      const isEscuadra = (tab === 'escuadra');
+      document.getElementById('btnSubTabEscuadra').classList.toggle('active', isEscuadra);
+      document.getElementById('btnSubTabIrregular').classList.toggle('active', !isEscuadra);
+      document.getElementById('subTabCintaEscuadra').style.display = isEscuadra ? 'flex' : 'none';
+      document.getElementById('subTabCintaIrregular').style.display = !isEscuadra ? 'flex' : 'none';
+      if (!isEscuadra) actualizarAsistenteIrregular();
+    }
+
+    function actualizarAsistenteIrregular() {
+      const a = parseFloat(document.getElementById('irrLado1').value) || 0; // V1 a V2
+      const b = parseFloat(document.getElementById('irrLado2').value) || 0; // V2 a V3
+      const c = parseFloat(document.getElementById('irrLado3').value) || 0; // V3 a V4
+      const d = parseFloat(document.getElementById('irrLado4').value) || 0; // V4 a V1
+      const e = parseFloat(document.getElementById('irrDiag').value) || 0;  // V1 a V3 (diagonal)
+
+      const perim = a + b + c + d;
+      document.getElementById('irrPerimRes').innerText = `${perim.toFixed(2)} m`;
+
+      // Validación desigualdad triangular:
+      // T1 (a, b, e) y T2 (c, d, e)
+      const valido1 = (a + b > e) && (a + e > b) && (b + e > a);
+      const valido2 = (c + d > e) && (c + e > d) && (d + e > c);
+
+      if (!valido1 || !valido2 || e <= 0) {
+        document.getElementById('irrAreaRes').innerText = "-- m²";
+        document.getElementById('irrStatusMsg').innerHTML = `<span style="color:var(--red);">⚠️ La diagonal de ${e}m no puede cerrar con esos lados. Verifica las medidas de campo.</span>`;
+        return false;
+      }
+
+      // Fórmula de Herón para los 2 triángulos:
+      const s1 = (a + b + e) / 2;
+      const area1 = Math.sqrt(Math.max(0, s1 * (s1 - a) * (s1 - b) * (s1 - e)));
+
+      const s2 = (c + d + e) / 2;
+      const area2 = Math.sqrt(Math.max(0, s2 * (s2 - c) * (s2 - d) * (s2 - e)));
+
+      const areaTotal = area1 + area2;
+      document.getElementById('irrAreaRes').innerText = `${areaTotal.toFixed(2)} m²`;
+      document.getElementById('irrStatusMsg').innerHTML = `<span style="color:#10b981;">✅ Geometría amarrada por triangulación: T1 (${area1.toFixed(1)}m²) + T2 (${area2.toFixed(1)}m²).</span>`;
+      return true;
+    }
+
+    function aplicarTerrenoIrregularCinta() {
+      if (!actualizarAsistenteIrregular()) {
+        alert("Por favor verifica las medidas de los 4 lados y la diagonal. Deben formar triángulos cerrados válidos.");
+        return;
+      }
+
+      const a = parseFloat(document.getElementById('irrLado1').value);
+      const b = parseFloat(document.getElementById('irrLado2').value);
+      const c = parseFloat(document.getElementById('irrLado3').value);
+      const d = parseFloat(document.getElementById('irrLado4').value);
+      const e = parseFloat(document.getElementById('irrDiag').value);
+
+      // Coordenadas cartesianas locales trianguladas:
+      // V1 en (0, 0)
+      // V3 en (e, 0)
+      // V2 en Triángulo 1 (a, b, e):
+      const cosV1_T1 = Math.max(-1, Math.min(1, (a*a + e*e - b*b) / (2 * a * e)));
+      const angV1_T1 = Math.acos(cosV1_T1);
+      const x2 = a * Math.cos(angV1_T1);
+      const y2 = a * Math.sin(angV1_T1);
+
+      // V4 en Triángulo 2 (d, c, e):
+      const cosV1_T2 = Math.max(-1, Math.min(1, (d*d + e*e - c*c) / (2 * d * e)));
+      const angV1_T2 = Math.acos(cosV1_T2);
+      const x4 = d * Math.cos(-angV1_T2);
+      const y4 = -d * Math.sin(angV1_T2);
+
+      const ptsMetros = [
+        { x: 0, y: 0 },
+        { x: x2, y: y2 },
+        { x: e, y: 0 },
+        { x: x4, y: y4 }
+      ];
+
+      // Convertir a Lat/Lon georreferenciadas
+      const baseLat = 25.686614;
+      const baseLon = -100.316112;
+      const R = 6378137.0;
+      const latRad = baseLat * (Math.PI / 180);
+      const lonRad = baseLon * (Math.PI / 180);
+
+      vertices = ptsMetros.map(pt => {
+        const deltaLat = pt.y / R;
+        const deltaLon = pt.x / (R * Math.cos(latRad));
+        return {
+          lat: (latRad + deltaLat) * (180 / Math.PI),
+          lon: (lonRad + deltaLon) * (180 / Math.PI),
+          acc: 0.1,
+          elev: 0,
+          timestamp: new Date().toLocaleTimeString()
+        };
+      });
+
+      document.getElementById('cfgProyecto').value = "Terreno Irregular Triangulado";
+      cerrarModal('modalCintaMetrica');
+      actualizarCalculos();
+      centrarPlano();
+      alert("✅ Terreno irregular trazado en el plano mediante Ley de Cosenos (Triangulación con cinta métrica).");
+    }
+
+    /* =====================================================================
+       ALTIMETRÍA, DESNIVEL & MOVIMIENTO DE TIERRAS (BULLDOZER)
+       ===================================================================== */
+    function calcularAltimetria() {
+      const cotaBaja = parseFloat(document.getElementById('altCotaBaja')?.value) || 0;
+      const cotaAlta = parseFloat(document.getElementById('altCotaAlta')?.value) || 1.4;
+      const hChipote = parseFloat(document.getElementById('chipoteAltura')?.value) || 1.8;
+      const diamChipote = parseFloat(document.getElementById('chipoteDiametro')?.value) || 8.0;
+
+      const desnivel = Math.max(0, cotaAlta - cotaBaja);
+      document.getElementById('altDesnivelTotal').innerText = `${desnivel.toFixed(2)} m`;
+
+      const pts = proyectarAMetros(vertices);
+      let distMax = 20;
+      if (pts.length >= 2) {
+        let maxD = 0;
+        for (let i = 0; i < pts.length; i++) {
+          for (let j = i + 1; j < pts.length; j++) {
+            const d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+            if (d > maxD) maxD = d;
+          }
+        }
+        if (maxD > 0) distMax = maxD;
+      }
+
+      const pendientePorc = (desnivel / distMax) * 100;
+      document.getElementById('altPendientePorc').innerText = `${pendientePorc.toFixed(2)} %`;
+
+      // Modelo de volumen del montículo (paraboloide topográfico de tierra en banco)
+      const radio = diamChipote / 2;
+      const areaBase = Math.PI * radio * radio;
+      const volBanco = (1 / 2) * areaBase * hChipote;
+      const volSuelto = volBanco * 1.20; // 20% abundamiento
+      const camiones = Math.ceil(volSuelto / 7);
+      const horasMaq = (volBanco / 20).toFixed(1);
+
+      document.getElementById('chipoteVolumen').innerText = `${volBanco.toFixed(2)} m³`;
+      document.getElementById('chipoteVolSuelto').innerText = `${volSuelto.toFixed(2)} m³`;
+      document.getElementById('chipoteCamiones').innerText = `≈ ${camiones} viajes`;
+      document.getElementById('chipoteHorasMaq').innerText = `≈ ${horasMaq} horas`;
+
+      document.getElementById('perfilVolumenTxt').innerText = `${volBanco.toFixed(2)} m³ (${volSuelto.toFixed(2)} m³ suelto)`;
+      document.getElementById('perfilCamionesTxt').innerText = `≈ ${camiones} viajes (7 m³) o ${Math.ceil(volSuelto / 14)} viajes (14 m³)`;
+
+      dibujarPerfilCorte();
+    }
+
+    function abrirModalPerfilCorte() {
+      calcularAltimetria();
+      document.getElementById('modalPerfilCorte').classList.add('open');
+      setTimeout(dibujarPerfilCorte, 100);
+    }
+
+    function dibujarPerfilCorte() {
+      const pCanvas = document.getElementById('perfilCanvas');
+      if (!pCanvas) return;
+      const pCtx = pCanvas.getContext('2d');
+      const pw = pCanvas.width;
+      const ph = pCanvas.height;
+
+      pCtx.fillStyle = '#061527';
+      pCtx.fillRect(0, 0, pw, ph);
+
+      const cotaBaja = parseFloat(document.getElementById('altCotaBaja')?.value) || 0;
+      const cotaAlta = parseFloat(document.getElementById('altCotaAlta')?.value) || 1.4;
+      const hChipote = parseFloat(document.getElementById('chipoteAltura')?.value) || 1.8;
+      const diamChipote = parseFloat(document.getElementById('chipoteDiametro')?.value) || 8.0;
+
+      const padX = 50;
+      const padY = 40;
+      const baseLineY = ph - padY - 30; // Nivel 0.00
+
+      // Grilla de perfil
+      pCtx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
+      pCtx.lineWidth = 1;
+      pCtx.setLineDash([2, 4]);
+      for (let y = padY; y <= baseLineY; y += 30) {
+        pCtx.beginPath();
+        pCtx.moveTo(padX, y);
+        pCtx.lineTo(pw - padX, y);
+        pCtx.stroke();
+      }
+      pCtx.setLineDash([]);
+
+      const xInicio = padX;
+      const xFin = pw - padX;
+      const anchoGrafico = xFin - xInicio;
+
+      const yInicioTerreno = baseLineY;
+      const yFinTerreno = baseLineY - (cotaAlta - cotaBaja) * 35; // Escala vertical exagerada x3 para visibilidad
+
+      const xCentro = xInicio + anchoGrafico / 2;
+      const radioPx = Math.min(110, (diamChipote / 2) * 14);
+      const hPx = hChipote * 38;
+
+      const xBase1 = xCentro - radioPx;
+      const xBase2 = xCentro + radioPx;
+      const yBaseCentro = yInicioTerreno + (yFinTerreno - yInicioTerreno) * 0.5;
+
+      // 1. Zona de Corte achurada (Rojo translúcido bajo el chipote)
+      pCtx.save();
+      pCtx.beginPath();
+      pCtx.moveTo(xBase1, yInicioTerreno + (yFinTerreno - yInicioTerreno) * ((xBase1 - xInicio) / anchoGrafico));
+      pCtx.quadraticCurveTo(xCentro, yBaseCentro - hPx, xBase2, yInicioTerreno + (yFinTerreno - yInicioTerreno) * ((xBase2 - xInicio) / anchoGrafico));
+      pCtx.lineTo(xBase1, yInicioTerreno + (yFinTerreno - yInicioTerreno) * ((xBase1 - xInicio) / anchoGrafico));
+      pCtx.closePath();
+      pCtx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+      pCtx.fill();
+      pCtx.strokeStyle = '#ef4444';
+      pCtx.lineWidth = 2;
+      pCtx.stroke();
+      pCtx.restore();
+
+      // 2. Línea de Terreno Natural
+      pCtx.beginPath();
+      pCtx.moveTo(xInicio, yInicioTerreno);
+      pCtx.lineTo(xBase1, yInicioTerreno + (yFinTerreno - yInicioTerreno) * ((xBase1 - xInicio) / anchoGrafico));
+      pCtx.quadraticCurveTo(xCentro, yBaseCentro - hPx, xBase2, yInicioTerreno + (yFinTerreno - yInicioTerreno) * ((xBase2 - xInicio) / anchoGrafico));
+      pCtx.lineTo(xFin, yFinTerreno);
+      pCtx.strokeStyle = '#10b981';
+      pCtx.lineWidth = 3;
+      pCtx.stroke();
+
+      // 3. Línea de Rasante / Proyecto (Línea donde el bulldozer rebaja)
+      pCtx.beginPath();
+      pCtx.moveTo(xInicio, yInicioTerreno);
+      pCtx.lineTo(xFin, yFinTerreno);
+      pCtx.strokeStyle = '#38bdf8';
+      pCtx.lineWidth = 2;
+      pCtx.setLineDash([4, 4]);
+      pCtx.stroke();
+      pCtx.setLineDash([]);
+
+      // 4. Anotaciones de Cota
+      pCtx.font = '700 11px "JetBrains Mono", monospace';
+      pCtx.fillStyle = '#10b981';
+      pCtx.fillText(`⌖ N+${cotaBaja.toFixed(2)}m`, xInicio - 10, yInicioTerreno + 18);
+      pCtx.fillText(`⌖ N+${cotaAlta.toFixed(2)}m`, xFin - 20, yFinTerreno - 10);
+
+      // Cota de la cima del chipote
+      pCtx.fillStyle = '#ffb703';
+      pCtx.textAlign = 'center';
+      pCtx.fillText(`⛰️ Cima: +${(cotaBaja + (cotaAlta-cotaBaja)*0.5 + hChipote).toFixed(2)}m (H: ${hChipote.toFixed(2)}m)`, xCentro, yBaseCentro - hPx - 10);
+
+      // Etiqueta de Rasante de Bulldozer
+      pCtx.fillStyle = '#38bdf8';
+      pCtx.textAlign = 'center';
+      pCtx.fillText(`🚜 Rasante Nivelada (Corte Bulldozer)`, xCentro, yBaseCentro + 22);
+
+      // Título y Leyenda
+      pCtx.font = '600 11px "Space Grotesk", sans-serif';
+      pCtx.fillStyle = '#94a3b8';
+      pCtx.textAlign = 'left';
+      pCtx.fillText("CORTE TRANSVERSAL A - A' (Pendiente y Desmonte)", padX, 24);
+    }
+
+    /* =====================================================================
+       MÓDULO 1: VISTA SATELITAL HD REAL (LEAFLET INTERACTIVO)
+       ===================================================================== */
+    let mapLeaflet = null;
+    let satPolygonLayer = null;
+    let satMarkersLayer = null;
+    let modoVistaActiva = '2d'; // '2d', 'satelital', '3d'
+
+    function cambiarModoVistaPrincipal(modo) {
+      modoVistaActiva = modo;
+      document.getElementById('btnView2D').classList.toggle('active', modo === '2d');
+      document.getElementById('btnViewSat').classList.toggle('active', modo === 'satelital');
+      document.getElementById('btnView3D').classList.toggle('active', modo === '3d');
+
+      const c2D = document.getElementById('planCanvas');
+      const cSat = document.getElementById('satelliteMapContainer');
+      const c3D = document.getElementById('cad3DContainer');
+      const hud = document.getElementById('canvasHudOverlay');
+
+      c2D.style.display = (modo === '2d') ? 'block' : 'none';
+      cSat.style.display = (modo === 'satelital') ? 'block' : 'none';
+      c3D.style.display = (modo === '3d') ? 'block' : 'none';
+      hud.style.display = (modo === '2d') ? 'flex' : 'none';
+
+      if (modo === 'satelital') {
+        inicializarOActualizarMapaSat();
+      } else if (modo === '3d') {
+        inicializarOActualizarVisor3D();
+      } else {
+        redibujar();
+      }
+    }
+
+    function inicializarOActualizarMapaSat() {
+      if (!mapLeaflet) {
+        mapLeaflet = L.map('satelliteMapContainer', {
+          zoomControl: false
+        }).setView([25.686614, -100.316112], 18);
+
+        L.control.zoom({ position: 'bottomright' }).addTo(mapLeaflet);
+
+        // Capa Satelital ESRI World Imagery HD
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+          maxZoom: 20
+        }).addTo(mapLeaflet);
+      }
+
+      if (satPolygonLayer) mapLeaflet.removeLayer(satPolygonLayer);
+      if (satMarkersLayer) mapLeaflet.removeLayer(satMarkersLayer);
+
+      satMarkersLayer = L.layerGroup().addTo(mapLeaflet);
+
+      if (vertices.length === 0) return;
+
+      const latlngs = vertices.map(v => [v.lat, v.lon]);
+
+      if (latlngs.length >= 3) {
+        satPolygonLayer = L.polygon(latlngs, {
+          color: '#00e5ff',
+          weight: 3,
+          fillColor: '#00e5ff',
+          fillOpacity: 0.25,
+          dashArray: '4, 4'
+        }).addTo(mapLeaflet);
+        mapLeaflet.fitBounds(satPolygonLayer.getBounds(), { padding: [50, 50] });
+      } else if (latlngs.length >= 1) {
+        satPolygonLayer = L.polyline(latlngs, {
+          color: '#00e5ff',
+          weight: 3
+        }).addTo(mapLeaflet);
+        mapLeaflet.setView(latlngs[0], 18);
+      }
+
+      // Marcadores en cada vértice
+      vertices.forEach((v, idx) => {
+        const customIcon = L.divIcon({
+          className: 'custom-sat-pin',
+          html: `<div style="background:#00e5ff; color:#000; font-weight:800; font-family:'Space Grotesk',sans-serif; font-size:10px; padding:2px 6px; border-radius:10px; border:2px solid #fff; box-shadow:0 0 10px #00e5ff; white-space:nowrap;">V${idx+1}</div>`,
+          iconSize: [28, 20],
+          iconAnchor: [14, 10]
+        });
+        L.marker([v.lat, v.lon], { icon: customIcon })
+          .bindPopup(`<b>Vértice V${idx+1}</b><br>Lat: ${v.lat.toFixed(6)}<br>Lon: ${v.lon.toFixed(6)}`)
+          .addTo(satMarkersLayer);
+      });
+
+      setTimeout(() => mapLeaflet.invalidateSize(), 200);
+    }
+
+    /* =====================================================================
+       MÓDULO 2: VISOR 3D CAD TIN MESH (THREE.JS - ROTACIÓN 360 EN 3 EJES)
+       ===================================================================== */
+    let scene3D, camera3D, renderer3D, controls3D, meshTIN3D, wireframe3D, points3DGroup, chipoteMesh3D;
+    let exagZ = 4.0;
+
+    function inicializarOActualizarVisor3D() {
+      const container = document.getElementById('cad3DContainer');
+      const w = container.clientWidth || 800;
+      const h = container.clientHeight || 520;
+
+      if (!renderer3D) {
+        scene3D = new THREE.Scene();
+        scene3D.background = new THREE.Color(0x060f1c);
+
+        camera3D = new THREE.PerspectiveCamera(45, w / h, 0.1, 2000);
+        camera3D.position.set(60, 50, 70);
+
+        renderer3D = new THREE.WebGLRenderer({ antialias: true });
+        renderer3D.setSize(w, h);
+        renderer3D.setPixelRatio(window.devicePixelRatio || 1);
+        container.appendChild(renderer3D.domElement);
+
+        controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement);
+        controls3D.enableDamping = true;
+        controls3D.dampingFactor = 0.08;
+        controls3D.screenSpacePanning = true;
+
+        // Iluminación CAD
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene3D.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0x00e5ff, 0.8);
+        dirLight.position.set(50, 100, 50);
+        scene3D.add(dirLight);
+
+        // Grilla Base CAD 3D de referencia
+        const gridHelper = new THREE.GridHelper(160, 32, 0x00e5ff, 0x16304d);
+        gridHelper.position.y = -0.5;
+        scene3D.add(gridHelper);
+
+        // Ejes X (Rojo), Y (Verde Elevación), Z (Azul)
+        const axesHelper = new THREE.AxesHelper(15);
+        scene3D.add(axesHelper);
+
+        // Animación render loop
+        function animar3D() {
+          requestAnimationFrame(animar3D);
+          controls3D.update();
+          renderer3D.render(scene3D, camera3D);
+        }
+        animar3D();
+
+        window.addEventListener('resize', () => {
+          if (container.clientWidth > 0 && renderer3D) {
+            camera3D.aspect = container.clientWidth / container.clientHeight;
+            camera3D.updateProjectionMatrix();
+            renderer3D.setSize(container.clientWidth, container.clientHeight);
+          }
+        });
+      }
+
+      // Reconstruir Malla TIN Topográfica 3D
+      construirGeometriaTerreno3D();
+    }
+
+    function construirGeometriaTerreno3D() {
+      if (!scene3D) return;
+
+      // 1. Configurar Paleta de Colores 3D según el Tema Activo
+      let theme3D = {
+        bg: 0x061a33,
+        gridColor1: 0x38bdf8,
+        gridColor2: 0x0d3863,
+        meshFill: 0x092b4d,
+        meshOpacity: 0.85,
+        wireframe: 0x38bdf8,
+        vertexBall: 0xffb703,
+        postDashed: 0x38bdf8,
+        labelVBg: '#00e5ff',
+        labelVText: '#000000',
+        cotaBg: 'rgba(9,36,68,0.95)',
+        cotaBorder: '#38bdf8',
+        cotaText: '#ffffff'
+      };
+
+      if (canvasTheme === 'darkcad') {
+        theme3D = {
+          bg: 0x060f1c,
+          gridColor1: 0x00e5ff,
+          gridColor2: 0x16304d,
+          meshFill: 0x071e36,
+          meshOpacity: 0.90,
+          wireframe: 0x00e5ff,
+          vertexBall: 0xffb703,
+          postDashed: 0xffb703,
+          labelVBg: '#ffb703',
+          labelVText: '#000000',
+          cotaBg: 'rgba(15,28,46,0.95)',
+          cotaBorder: '#ffb703',
+          cotaText: '#ffffff'
+        };
+      } else if (canvasTheme === 'white') {
+        theme3D = {
+          bg: 0xf1f5f9,
+          gridColor1: 0x0284c7,
+          gridColor2: 0xcfd8dc,
+          meshFill: 0xe2e8f0,
+          meshOpacity: 0.92,
+          wireframe: 0x0f172a,
+          vertexBall: 0x0284c7,
+          postDashed: 0x0284c7,
+          labelVBg: '#0284c7',
+          labelVText: '#ffffff',
+          cotaBg: 'rgba(255,255,255,0.95)',
+          cotaBorder: '#0284c7',
+          cotaText: '#0f172a'
+        };
+      }
+
+      // Actualizar fondo de escena 3D y grilla base
+      scene3D.background = new THREE.Color(theme3D.bg);
+
+      // Limpiar objetos anteriores
+      if (meshTIN3D) scene3D.remove(meshTIN3D);
+      if (wireframe3D) scene3D.remove(wireframe3D);
+      if (points3DGroup) scene3D.remove(points3DGroup);
+      if (chipoteMesh3D) scene3D.remove(chipoteMesh3D);
+
+      // Reemplazar Grilla Base 3D según tema
+      const objGridPrev = scene3D.getObjectByName("cadGridHelper");
+      if (objGridPrev) scene3D.remove(objGridPrev);
+
+      const gridHelper = new THREE.GridHelper(160, 32, theme3D.gridColor1, theme3D.gridColor2);
+      gridHelper.name = "cadGridHelper";
+      gridHelper.position.y = -0.5;
+      scene3D.add(gridHelper);
+
+      points3DGroup = new THREE.Group();
+      scene3D.add(points3DGroup);
+
+      const pts = proyectarAMetros(vertices);
+      if (pts.length < 3) return;
+
+      const cotaBaja = parseFloat(document.getElementById('altCotaBaja')?.value) || 0;
+      const cotaAlta = parseFloat(document.getElementById('altCotaAlta')?.value) || 1.4;
+      const hChipote = parseFloat(document.getElementById('chipoteAltura')?.value) || 1.8;
+      const diamChipote = parseFloat(document.getElementById('chipoteDiametro')?.value) || 8.0;
+      const tieneChipote = document.getElementById('chkActivarChipote')?.checked ?? true;
+
+      // Centroide
+      let cX = 0, cY = 0;
+      pts.forEach(p => { cX += p.x; cY += p.y; });
+      cX /= pts.length;
+      cY /= pts.length;
+
+      // Generar puntos 3D centrados
+      const numRings = 4;
+
+      // Triangulación Radial / Delaunay TIN para el polígono 3D
+      const geom = new THREE.BufferGeometry();
+      const verticesPos = [];
+      const indices = [];
+
+      // Vértice central 0
+      const elevCentro = (cotaBaja + (cotaAlta - cotaBaja) * 0.5 + (tieneChipote ? hChipote : 0)) * exagZ;
+      verticesPos.push(0, elevCentro, 0);
+
+      // Anillos concéntricos de subdivisión triangulada TIN (idéntica a Civil 3D Wireframe)
+      for (let r = 1; r <= numRings; r++) {
+        const factorR = r / numRings;
+        for (let i = 0; i < pts.length; i++) {
+          const pA = pts[i];
+          const pB = pts[(i + 1) % pts.length];
+          const segSteps = 3;
+          for (let s = 0; s < segSteps; s++) {
+            const frac = s / segSteps;
+            const px = (pA.x + (pB.x - pA.x) * frac - cX) * factorR;
+            const pz = -(pA.y + (pB.y - pA.y) * frac - cY) * factorR;
+
+            // Inclinación natural
+            let zElev = (cotaBaja + (cotaAlta - cotaBaja) * ((px + 20) / 40));
+
+            // Elevación del chipote/loma parabólica
+            if (tieneChipote) {
+              const distAlCentro = Math.hypot(px, pz);
+              if (distAlCentro < (diamChipote / 2)) {
+                const hParab = hChipote * (1 - Math.pow(distAlCentro / (diamChipote / 2), 2));
+                zElev += hParab;
+              }
+            }
+
+            verticesPos.push(px, zElev * exagZ, pz);
+          }
+        }
+      }
+
+      // Crear caras triangulares (TIN Mesh)
+      const ptsPerRing = pts.length * 3;
+      // Triángulos centro con anillo 1
+      for (let i = 0; i < ptsPerRing; i++) {
+        const next = (i + 1) % ptsPerRing;
+        indices.push(0, 1 + i, 1 + next);
+      }
+
+      // Triángulos entre anillos sucesivos
+      for (let r = 0; r < numRings - 1; r++) {
+        const ringStart = 1 + r * ptsPerRing;
+        const nextRingStart = 1 + (r + 1) * ptsPerRing;
+        for (let i = 0; i < ptsPerRing; i++) {
+          const next = (i + 1) % ptsPerRing;
+          const a = ringStart + i;
+          const b = ringStart + next;
+          const c = nextRingStart + i;
+          const d = nextRingStart + next;
+
+          indices.push(a, c, b);
+          indices.push(b, c, d);
+        }
+      }
+
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(verticesPos, 3));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+
+      // Material Superficie Sólida según Tema
+      const matFill = new THREE.MeshPhongMaterial({
+        color: theme3D.meshFill,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: theme3D.meshOpacity
+      });
+      meshTIN3D = new THREE.Mesh(geom, matFill);
+      scene3D.add(meshTIN3D);
+
+      // Malla de Alambre TIN Alámbrica según Tema
+      const wireframeGeom = new THREE.WireframeGeometry(geom);
+      const wireframeMat = new THREE.LineBasicMaterial({
+        color: theme3D.wireframe,
+        linewidth: 1.5,
+        transparent: true,
+        opacity: 0.95
+      });
+      wireframe3D = new THREE.LineSegments(wireframeGeom, wireframeMat);
+      scene3D.add(wireframe3D);
+
+      // Variables de visibilidad de capas 3D
+      if (typeof mostrarCotas3D === 'undefined') window.mostrarCotas3D = true;
+      if (typeof mostrarNiveles3D === 'undefined') window.mostrarNiveles3D = true;
+
+      // Función auxiliar para crear Sprites de Texto 3D de alta nitidez
+      function crearTextoSprite3D(texto, colorTexto = '#ffffff', colorBg = '#0b1e36', borderColor = '#00e5ff', fontSize = 28) {
+        const spriteCanvas = document.createElement('canvas');
+        spriteCanvas.width = 380;
+        spriteCanvas.height = 100;
+        const sCtx = spriteCanvas.getContext('2d');
+
+        sCtx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
+        const textWidth = sCtx.measureText(texto).width;
+        const boxW = textWidth + 36;
+        const boxH = 54;
+        const boxX = (spriteCanvas.width - boxW) / 2;
+        const boxY = (spriteCanvas.height - boxH) / 2;
+
+        // Fondo y borde
+        sCtx.fillStyle = colorBg;
+        sCtx.roundRect ? sCtx.roundRect(boxX, boxY, boxW, boxH, 12) : sCtx.fillRect(boxX, boxY, boxW, boxH);
+        sCtx.fill();
+        sCtx.strokeStyle = borderColor;
+        sCtx.lineWidth = 4;
+        sCtx.stroke();
+
+        // Texto
+        sCtx.fillStyle = colorTexto;
+        sCtx.textAlign = 'center';
+        sCtx.textBaseline = 'middle';
+        sCtx.fillText(texto, spriteCanvas.width / 2, spriteCanvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(spriteCanvas);
+        texture.minFilter = THREE.LinearFilter;
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(12, 3.2, 1);
+        return sprite;
+      }
+
+      // Esferas, etiquetas de vértice y cotas de nivel Z
+      pts.forEach((p, idx) => {
+        const px = p.x - cX;
+        const pz = -(p.y - cY);
+        const zReal = ((idx === 0) ? cotaBaja : (cotaBaja + (cotaAlta - cotaBaja) * (idx / (pts.length - 1))));
+        const zElev = zReal * exagZ;
+
+        // Esfera Vértice
+        const sphereGeo = new THREE.SphereGeometry(1.2, 16, 16);
+        const sphereMat = new THREE.MeshBasicMaterial({ color: theme3D.vertexBall });
+        const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+        sphereMesh.position.set(px, zElev, pz);
+        points3DGroup.add(sphereMesh);
+
+        // Poste hacia el nivel 0
+        const postGeom = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(px, 0, pz),
+          new THREE.Vector3(px, zElev, pz)
+        ]);
+        const postLine = new THREE.Line(postGeom, new THREE.LineDashedMaterial({ color: theme3D.postDashed, dashSize: 0.8, gapSize: 0.5 }));
+        postLine.computeLineDistances();
+        points3DGroup.add(postLine);
+
+        // Etiqueta del Vértice (V1, V2...)
+        const spriteV = crearTextoSprite3D(`V${idx+1}`, theme3D.labelVText, theme3D.labelVBg, '#ffffff', 36);
+        spriteV.position.set(px, zElev + 3.5, pz);
+        spriteV.scale.set(7, 2.0, 1);
+        points3DGroup.add(spriteV);
+
+        // Cota de Nivel Z Topográfico (+Nivel m)
+        if (window.mostrarNiveles3D) {
+          const spriteZ = crearTextoSprite3D(`⌖ N+${zReal.toFixed(2)}m`, '#10b981', theme3D.cotaBg, '#10b981', 26);
+          spriteZ.position.set(px, zElev + 6.2, pz);
+          spriteZ.scale.set(10, 2.6, 1);
+          points3DGroup.add(spriteZ);
+        }
+      });
+
+      // Cotas métricas 3D flotantes en cada tramo del perímetro
+      if (window.mostrarCotas3D) {
+        for (let i = 0; i < pts.length; i++) {
+          const pA = pts[i];
+          const pB = pts[(i + 1) % pts.length];
+          const pAx = pA.x - cX;
+          const pAz = -(pA.y - cY);
+          const pBx = pB.x - cX;
+          const pBz = -(pB.y - cY);
+
+          const zRealA = ((i === 0) ? cotaBaja : (cotaBaja + (cotaAlta - cotaBaja) * (i / (pts.length - 1))));
+          const zRealB = (((i + 1) % pts.length === 0) ? cotaBaja : (cotaBaja + (cotaAlta - cotaBaja) * (((i + 1) % pts.length) / (pts.length - 1))));
+
+          const midX = (pAx + pBx) / 2;
+          const midZ = (pAz + pBz) / 2;
+          const midY = ((zRealA + zRealB) / 2) * exagZ + 2.5;
+
+          const distReal = Math.hypot(pB.x - pA.x, pB.y - pA.y);
+          const az = calcularAzimut(pA, pB);
+          const rumboStr = formatearRumbo(az);
+
+          // Sprite de Cota 3D (Distancia y Rumbo)
+          const spriteCota = crearTextoSprite3D(`${distReal.toFixed(2)}m (${rumboStr})`, theme3D.cotaText, theme3D.cotaBg, theme3D.cotaBorder, 24);
+          spriteCota.position.set(midX, midY, midZ);
+          spriteCota.scale.set(15, 3.8, 1);
+          points3DGroup.add(spriteCota);
+
+          // Línea de cota 3D exterior
+          const cotaLineGeom = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(pAx, zRealA * exagZ + 1.2, pAz),
+            new THREE.Vector3(pBx, zRealB * exagZ + 1.2, pBz)
+          ]);
+          const cotaLine = new THREE.Line(cotaLineGeom, new THREE.LineBasicMaterial({ color: theme3D.cotaBorder, linewidth: 2 }));
+          points3DGroup.add(cotaLine);
+        }
+      }
+
+      // Cota 3D flotante en la cima del Chipote
+      if (tieneChipote && window.mostrarNiveles3D) {
+        const cotaCima = (cotaBaja + (cotaAlta - cotaBaja) * 0.5 + hChipote);
+        const spriteChip = crearTextoSprite3D(`⛰️ Cima: +${cotaCima.toFixed(2)}m (H: ${hChipote.toFixed(2)}m)`, '#ffb703', theme3D.cotaBg, '#ef4444', 24);
+        spriteChip.position.set(0, (cotaCima * exagZ) + 4.5, 0);
+        spriteChip.scale.set(16, 4.0, 1);
+        points3DGroup.add(spriteChip);
+      }
+
+      controls3D.target.set(0, 5, 0);
+      controls3D.update();
+    }
+
+    function toggleCotas3D() {
+      window.mostrarCotas3D = !window.mostrarCotas3D;
+      const btn = document.getElementById('btn3DCotas');
+      if (btn) {
+        btn.classList.toggle('active', window.mostrarCotas3D);
+        btn.innerText = `📏 Cotas 3D [${window.mostrarCotas3D ? 'ON' : 'OFF'}]`;
+      }
+      construirGeometriaTerreno3D();
+    }
+
+    function toggleNiveles3D() {
+      window.mostrarNiveles3D = !window.mostrarNiveles3D;
+      const btn = document.getElementById('btn3DNiveles');
+      if (btn) {
+        btn.classList.toggle('active', window.mostrarNiveles3D);
+        btn.innerText = `⌖ Niveles Z [${window.mostrarNiveles3D ? 'ON' : 'OFF'}]`;
+      }
+      construirGeometriaTerreno3D();
+    }
+
+    function actualizarExageracion3D(val) {
+      exagZ = parseFloat(val);
+      document.getElementById('valExag3D').innerText = `${val}x`;
+      construirGeometriaTerreno3D();
+    }
+
+    function reiniciarCamara3D(tipo) {
+      if (!camera3D || !controls3D) return;
+      if (tipo === 'isometrica') {
+        camera3D.position.set(60, 50, 70);
+      } else if (tipo === 'planta') {
+        camera3D.position.set(0, 110, 0.1);
+      } else if (tipo === 'perfil') {
+        camera3D.position.set(90, 10, 0);
+      }
+      controls3D.target.set(0, 5, 0);
+      controls3D.update();
+    }
+
+    /* =====================================================================
+       MÓDULO 3: COLINDANCIAS & MEMORIA DESCRIPTIVA NOTARIAL
+       ===================================================================== */
+    let colindantesData = {}; // { 0: "Con Propiedad de...", 1: "Con Calle..." }
+
+    function actualizarModuloColindancias() {
+      const container = document.getElementById('colindanciasListaContainer');
+      const txtMemoria = document.getElementById('txtMemoriaDescriptiva');
+      if (!container || !txtMemoria) return;
+
+      container.innerHTML = "";
+      const pts = proyectarAMetros(vertices);
+
+      if (pts.length < 3) {
+        container.innerHTML = `<div style="text-align:center; padding:12px; color:var(--text-muted); font-size:0.75rem;">Registra al menos 3 vértices para definir colindancias.</div>`;
+        txtMemoria.value = "";
+        return;
+      }
+
+      let memoriaTexto = `MEMORIA DESCRIPTIVA Y CUADRO DE COLINDANCIAS\n`;
+      memoriaTexto += `PREDIO: ${document.getElementById('cfgProyecto')?.value || 'TERRENO'}\n`;
+      memoriaTexto += `PROPIETARIO: ${document.getElementById('cfgPropietario')?.value || 'ING. TOPÓGRAFO'}\n`;
+      memoriaTexto += `SUPERFICIE TOTAL: ${areaDisplay.innerText} (${areaHaDisplay.innerText})\n`;
+      memoriaTexto += `PERÍMETRO: ${perimeterDisplay.innerText}\n\n`;
+      memoriaTexto += `DESCRIPCIÓN DE LINDEROS:\n`;
+
+      for (let i = 0; i < pts.length; i++) {
+        const pA = pts[i];
+        const pB = pts[(i + 1) % pts.length];
+        const dist = Math.hypot(pB.x - pA.x, pB.y - pA.y);
+        const azimut = calcularAzimut(pA, pB);
+        const rumboStr = formatearRumbo(azimut);
+
+        // Determinar rumbo cardinal principal aproximado
+        let cardinal = "NORTE";
+        if (azimut >= 45 && azimut < 135) cardinal = "ORIENTE (ESTE)";
+        else if (azimut >= 135 && azimut < 225) cardinal = "SUR";
+        else if (azimut >= 225 && azimut < 315) cardinal = "PONIENTE (OESTE)";
+        else cardinal = "NORTE";
+
+        const colindanteVal = colindantesData[i] || (i === 0 ? "Calle Principal" : `Propiedad de Vecino Lote ${i+1}`);
+
+        // Fila en el formulario
+        const divRow = document.createElement('div');
+        divRow.style.cssText = "display:flex; flex-direction:column; gap:3px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; border:1px solid var(--border-color);";
+        divRow.innerHTML = `
+          <div style="display:flex; justify-content:space-between; font-size:0.72rem;">
+            <b style="color:var(--cyan);">Tramo V${i+1} a V${(i+1)%pts.length+1} (${cardinal})</b>
+            <span style="color:var(--gold); font-family:var(--font-mono);">${dist.toFixed(2)}m (${rumboStr})</span>
+          </div>
+          <input type="text" class="form-control" style="font-size:0.75rem; padding:4px 8px;" value="${colindanteVal}" oninput="guardarColindante(${i}, this.value)">
+        `;
+        container.appendChild(divRow);
+
+        // Texto notarial
+        memoriaTexto += `• AL ${cardinal}: Del vértice V${i+1} al vértice V${(i+1)%pts.length+1}, con rumbo ${rumboStr} y una distancia en línea recta de ${dist.toFixed(2)} metros, colindando con: ${colindanteVal}.\n`;
+      }
+
+      memoriaTexto += `\nEl polígono cierra formalmente en el punto de partida V1, determinando un polígono cerrado de ${pts.length} lados y ${pts.length} vértices georreferenciados en el sistema WGS84.`;
+      txtMemoria.value = memoriaTexto;
+    }
+
+    function guardarColindante(idx, val) {
+      colindantesData[idx] = val;
+      actualizarModuloColindancias();
+    }
+
+    function copiarMemoriaDescriptiva() {
+      const txt = document.getElementById('txtMemoriaDescriptiva');
+      if (!txt || !txt.value) return;
+      txt.select();
+      navigator.clipboard.writeText(txt.value).then(() => {
+        alert("📋 ¡Memoria Descriptiva y Colindancias copiadas al portapapeles! Lista para pegar en Word, Notaría o Contrato.");
+      });
+    }
+
+    /* =====================================================================
+       MÓDULO 4: SUBDIVISIÓN DE LOTES (FRACCIONAMIENTO EN VIVO)
+       ===================================================================== */
+    function actualizarModuloSubdivision() {
+      const chk = document.getElementById('chkActivarSubdivision');
+      const sel1 = document.getElementById('selSubdivV1');
+      const sel2 = document.getElementById('selSubdivV2');
+      if (!sel1 || !sel2) return;
+
+      const pts = proyectarAMetros(vertices);
+      if (pts.length < 4) {
+        sel1.innerHTML = `<option>Requiere 4+ vértices</option>`;
+        sel2.innerHTML = `<option>Requiere 4+ vértices</option>`;
+        return;
+      }
+
+      // Guardar selección actual
+      const v1Val = parseInt(sel1.value) || 1;
+      const v2Val = parseInt(sel2.value) || 3;
+
+      sel1.innerHTML = "";
+      sel2.innerHTML = "";
+
+      pts.forEach((p, idx) => {
+        sel1.innerHTML += `<option value="${idx+1}">Vértice V${idx+1}</option>`;
+        sel2.innerHTML += `<option value="${idx+1}">Vértice V${idx+1}</option>`;
+      });
+
+      sel1.value = Math.min(v1Val, pts.length);
+      sel2.value = Math.min(Math.max(v2Val, v1Val + 2), pts.length);
+
+      if (chk && chk.checked) {
+        const i1 = parseInt(sel1.value) - 1;
+        const i2 = parseInt(sel2.value) - 1;
+
+        if (i1 === i2 || Math.abs(i1 - i2) === 1 || Math.abs(i1 - i2) === pts.length - 1) {
+          document.getElementById('subdivAreaA').innerText = "-- (Elige vértices no adyacentes)";
+          document.getElementById('subdivAreaB').innerText = "--";
+          return;
+        }
+
+        const pA = pts[i1];
+        const pB = pts[i2];
+        const distCorte = Math.hypot(pB.x - pA.x, pB.y - pA.y);
+        document.getElementById('subdivLongitudLinea').innerText = `${distCorte.toFixed(2)} m`;
+
+        // Polígono Fracción A (de i1 a i2)
+        const polyA = [];
+        let idx = i1;
+        while (true) {
+          polyA.push(pts[idx]);
+          if (idx === i2) break;
+          idx = (idx + 1) % pts.length;
+        }
+
+        // Polígono Fracción B (de i2 a i1)
+        const polyB = [];
+        idx = i2;
+        while (true) {
+          polyB.push(pts[idx]);
+          if (idx === i1) break;
+          idx = (idx + 1) % pts.length;
+        }
+
+        const calcArea = (poly) => {
+          let a = 0;
+          for (let i = 0; i < poly.length; i++) {
+            const j = (i + 1) % poly.length;
+            a += poly[i].x * poly[j].y - poly[j].x * poly[i].y;
+          }
+          return Math.abs(a) / 2.0;
+        };
+
+        const areaA = calcArea(polyA);
+        const areaB = calcArea(polyB);
+        const areaTotal = areaA + areaB;
+
+        const porcA = areaTotal > 0 ? (areaA / areaTotal) * 100 : 0;
+        const porcB = areaTotal > 0 ? (areaB / areaTotal) * 100 : 0;
+
+        document.getElementById('subdivAreaA').innerText = `${areaA.toFixed(2)} m² (${porcA.toFixed(1)}%)`;
+        document.getElementById('subdivAreaB').innerText = `${areaB.toFixed(2)} m² (${porcB.toFixed(1)}%)`;
+      }
+    }
+
+    /* =====================================================================
+       MÓDULO 5: FOTOGRAFÍAS DE CAMPO & MOJONERAS
+       ===================================================================== */
+    let fotosVertices = []; // Array de { verticeIdx, dataUrl, fecha, coords }
+
+    function abrirCamaraVertice() {
+      if (vertices.length === 0) {
+        alert("Registra al menos un vértice para adjuntar su fotografía.");
+        return;
+      }
+      document.getElementById('inputFotoVertice').click();
+    }
+
+    function procesarFotoVertice(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const vIdx = vertices.length;
+        const ultimo = vertices[vertices.length - 1];
+
+        fotosVertices.push({
+          vIdx: vIdx,
+          dataUrl: e.target.result,
+          fecha: new Date().toLocaleString(),
+          lat: ultimo ? ultimo.lat : 0,
+          lon: ultimo ? ultimo.lon : 0
+        });
+
+        actualizarGaleriaFotos();
+        alert(`📸 Foto vinculada con éxito a la mojonera del Vértice V${vIdx}.`);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function actualizarGaleriaFotos() {
+      const container = document.getElementById('fotosGaleriaContainer');
+      if (!container) return;
+
+      if (fotosVertices.length === 0) {
+        container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--text-muted); font-size:0.75rem;">Sin fotos adjuntas a las mojoneras.<br>Toma fotos a los vértices con tu celular para anexarlas al reporte.</div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      fotosVertices.forEach((foto, i) => {
+        const card = document.createElement('div');
+        card.style.cssText = "background:#091524; border:1px solid var(--border-color); border-radius:8px; overflow:hidden; display:flex; flex-direction:column;";
+        card.innerHTML = `
+          <div style="position:relative; height:90px; background:#000;">
+            <img src="${foto.dataUrl}" style="width:100%; height:100%; object-fit:cover;">
+            <span style="position:absolute; top:4px; left:4px; background:var(--cyan); color:#000; font-weight:800; font-size:0.65rem; padding:1px 5px; border-radius:4px;">Mojonera V${foto.vIdx}</span>
+          </div>
+          <div style="padding:6px; font-size:0.68rem; color:var(--text-muted); display:flex; flex-direction:column; gap:2px;">
+            <span>📅 ${foto.fecha}</span>
+            <span style="font-family:var(--font-mono); color:#fff;">📍 ${foto.lat.toFixed(5)}, ${foto.lon.toFixed(5)}</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+  </script>
+</body>
+</html>
