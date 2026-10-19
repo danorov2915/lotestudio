@@ -97,6 +97,7 @@
       letter-spacing: -0.02em;
       background: linear-gradient(90deg, #ffffff, var(--cyan));
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
@@ -740,6 +741,87 @@
         background: #fff !important;
       }
     }
+  
+    /* =====================================================================
+       ESTILOS DEL MODO DEMO Y ACTIVACIÓN DE LICENCIA (10 MEDICIONES)
+       ===================================================================== */
+    .badge-license-demo {
+      background: rgba(245, 158, 11, 0.18);
+      border: 1px solid #F59E0B;
+      color: #FBBF24;
+      font-weight: 800;
+      font-size: 0.78rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+    .badge-license-demo:hover {
+      background: rgba(245, 158, 11, 0.3);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+    }
+    .badge-license-pro {
+      background: rgba(16, 185, 129, 0.18);
+      border: 1px solid #10B981;
+      color: #34D399;
+      font-weight: 800;
+      font-size: 0.78rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .activation-card-box {
+      background: #0d1a2d;
+      border: 1px solid #1e3352;
+      border-radius: 14px;
+      padding: 16px;
+      margin: 10px 0;
+    }
+    .device-id-badge {
+      font-family: monospace;
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: #38BDF8;
+      background: rgba(56, 189, 248, 0.12);
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px dashed #38BDF8;
+      letter-spacing: 0.08em;
+      user-select: all;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    .input-license-code {
+      font-family: monospace;
+      font-size: 1.15rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-align: center;
+      color: #34D399;
+      background: #081220;
+      border: 1px solid #1e3352;
+      border-radius: 10px;
+      padding: 12px;
+      width: 100%;
+      outline: none;
+      box-sizing: border-box;
+      transition: all 0.2s;
+    }
+    .input-license-code:focus {
+      border-color: #38BDF8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+
   </style>
   <!-- PWA KIT OFICIAL -->
   <link rel="manifest" href="manifest.json">
@@ -747,7 +829,406 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="LoteStudio">
   <link rel="apple-touch-icon" href="LoteStudio.png">
+  
+  <!-- =====================================================================
+       MODAL DE ACTIVACIÓN DE LICENCIA (LIMITADOR A 10 MEDICIONES)
+       ===================================================================== -->
+  <div class="modal-backdrop" id="modalActivacion">
+    <div class="modal-box" style="max-width: 520px; text-align: center;">
+      <div class="modal-header" style="justify-content: center; position: relative;">
+        <h3 id="modalActivacionTitle" style="color: #F59E0B; display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0;">
+          <span>🎯</span> Modo Demostración (10 Mediciones)
+        </h3>
+        <button class="modal-close" style="position: absolute; right: 0; top: 0;" onclick="cerrarModal('modalActivacion')">&times;</button>
+      </div>
+
+      <div id="demoNoticeBanner" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 12px; padding: 12px 14px; font-size: 0.85rem; color: #FDE68A; line-height: 1.45;">
+        <span id="demoNoticeText">Has utilizado <strong>0 de 10 mediciones</strong> gratuitas de prueba. Al llegar a la 11ª medición el sistema requerirá activación definitiva.</span>
+      </div>
+
+      <div class="activation-card-box">
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+          Tu Identificador de Instalación (ID de Topógrafo):
+        </div>
+        <div id="displayDeviceId" class="device-id-badge">LS-0000-0000</div>
+        <div style="margin-top: 8px;">
+          <button type="button" class="btn-chip" style="font-size: 0.72rem; padding: 4px 10px;" onclick="copiarIdInstalacion()">
+            📋 Copiar ID
+          </button>
+        </div>
+      </div>
+
+      <div style="text-align: left;">
+        <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">
+          Ingresa tu Clave de Activación Permanente:
+        </label>
+        <input type="text" id="inputActivationKey" class="input-license-code" placeholder="ACT-XXXX-XXXX-XXXX" autocomplete="off">
+      </div>
+
+      <button type="button" class="btn-guardar-punto" style="width: 100%; padding: 14px; font-size: 0.95rem; font-weight: 800; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #fff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);" onclick="activarLicenciaLoteStudio()">
+        🔑 ACTIVAR LICENCIA PERMANENTE
+      </button>
+
+      <div style="border-top: 1px solid var(--border-color); padding-top: 14px;">
+        <button type="button" class="btn-chip" style="width: 100%; background: #00A859; color: #fff; border-color: #008746; font-size: 0.85rem; padding: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="solicitarLicenciaWhatsApp()">
+          <span>💬</span> Solicitar Clave por WhatsApp al Vendedor ($1,690 MXN)
+        </button>
+      </div>
+
+      <div id="activationSuccessNotice" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; border-radius: 10px; padding: 10px; color: #34D399; font-weight: 700; font-size: 0.85rem;">
+        ¡Licencia activada con éxito! Disfruta de mediciones y exportaciones ilimitadas de por vida.
+      </div>
+    </div>
+  </div>
+
   <script>
+
+    /* =====================================================================
+       RASTREO DE UBICACIÓN Y COORDENADAS GPS EN TIEMPO REAL (EN VIVO)
+       ===================================================================== */
+    let userLeafletMarker = null;
+    let userLeafletCircle = null;
+
+    function dibujarPosicionEnVivoGPS(w, h, pts, escalaFinal, centroX, centroY, toScreen, colors) {
+      if (!ultimaPosicion) return;
+
+      const R = 6378137.0;
+      let userMetric = { x: 0, y: 0 };
+
+      if (vertices.length > 0) {
+        const latRef = vertices[0].lat * (Math.PI / 180);
+        const lonRef = vertices[0].lon * (Math.PI / 180);
+        const uLatRad = ultimaPosicion.latitude * (Math.PI / 180);
+        const uLonRad = ultimaPosicion.longitude * (Math.PI / 180);
+        userMetric.x = (uLonRad - lonRef) * Math.cos(latRef) * R;
+        userMetric.y = (uLatRad - latRef) * R;
+      } else {
+        userMetric.x = 0;
+        userMetric.y = 0;
+      }
+
+      const screenPos = toScreen(userMetric);
+      const acc = ultimaPosicion.accuracy || 2.0;
+      const radiusPx = Math.max(8, Math.min(acc * escalaFinal, 120));
+
+      // 1. Círculo de Margen de Error / Precisión GPS
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(screenPos.sx, screenPos.sy, radiusPx, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 210, 255, 0.12)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0, 210, 255, 0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. Línea elástica punteada desde el último vértice hasta donde está parado el topógrafo
+      if (pts.length > 0) {
+        const lastP = pts[pts.length - 1];
+        const lastScreen = toScreen(lastP);
+        const distReal = Math.hypot(userMetric.x - lastP.x, userMetric.y - lastP.y);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(lastScreen.sx, lastScreen.sy);
+        ctx.lineTo(screenPos.sx, screenPos.sy);
+        ctx.strokeStyle = "#F59E0B";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.restore();
+
+        // Etiqueta flotante de distancia al último vértice
+        const midX = (lastScreen.sx + screenPos.sx) / 2;
+        const midY = (lastScreen.sy + screenPos.sy) / 2;
+        ctx.save();
+        ctx.font = "bold 11px monospace";
+        const labelDist = `📏 ${distReal.toFixed(2)} m (al V${pts.length})`;
+        const textWidth = ctx.measureText(labelDist).width;
+        ctx.fillStyle = "rgba(10, 20, 35, 0.9)";
+        ctx.fillRect(midX - textWidth / 2 - 4, midY - 10, textWidth + 8, 18);
+        ctx.strokeStyle = "#F59E0B";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(midX - textWidth / 2 - 4, midY - 10, textWidth + 8, 18);
+        ctx.fillStyle = "#FDE68A";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(labelDist, midX, midY - 1);
+        ctx.restore();
+      }
+
+      // 3. Radar Crosshair y Punto de Posición Actual
+      ctx.save();
+      // Anillo exterior
+      ctx.beginPath();
+      ctx.arc(screenPos.sx, screenPos.sy, 10, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 210, 255, 0.35)";
+      ctx.fill();
+      ctx.strokeStyle = "#00D2FF";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Centro blanco
+      ctx.beginPath();
+      ctx.arc(screenPos.sx, screenPos.sy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fill();
+
+      // Mira telescópica / Crosshair
+      ctx.strokeStyle = "#00D2FF";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(screenPos.sx - 16, screenPos.sy);
+      ctx.lineTo(screenPos.sx + 16, screenPos.sy);
+      ctx.moveTo(screenPos.sx, screenPos.sy - 16);
+      ctx.lineTo(screenPos.sx, screenPos.sy + 16);
+      ctx.stroke();
+
+      // Etiqueta de Coordenadas en Vivo flotante junto al cursor
+      const coordTag = `📍 TÚ (Lat: ${ultimaPosicion.latitude.toFixed(6)}°, Lon: ${ultimaPosicion.longitude.toFixed(6)}°)`;
+      ctx.font = "bold 10px sans-serif";
+      const tagWidth = ctx.measureText(coordTag).width;
+      const tagX = screenPos.sx + 14;
+      const tagY = screenPos.sy - 20;
+      ctx.fillStyle = "rgba(6, 11, 20, 0.92)";
+      ctx.fillRect(tagX - 4, tagY - 12, tagWidth + 8, 20);
+      ctx.strokeStyle = "#00D2FF";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(tagX - 4, tagY - 12, tagWidth + 8, 20);
+      ctx.fillStyle = "#38BDF8";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(coordTag, tagX, tagY - 2);
+      ctx.restore();
+    }
+
+    function actualizarPosicionSatelitalEnVivo(lat, lon, acc) {
+      if (typeof mapLeaflet === 'undefined' || !mapLeaflet) return;
+      const latlng = [lat, lon];
+      if (!userLeafletMarker) {
+        if (typeof L !== 'undefined' && L.divIcon) {
+          const icon = L.divIcon({
+            className: 'custom-user-marker',
+            html: '<div style="width:18px; height:18px; background:#00D2FF; border:3px solid #fff; border-radius:50%; box-shadow:0 0 14px rgba(0,210,255,0.9); animation:pulseUser 1.5s infinite;"></div>',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+          });
+          userLeafletMarker = L.marker(latlng, { icon }).addTo(mapLeaflet).bindPopup('📍 Tú estás aquí (Posición GPS en Vivo)');
+          userLeafletCircle = L.circle(latlng, { radius: acc, color: '#00D2FF', fillColor: '#00D2FF', fillOpacity: 0.15, weight: 1.5, dashArray: '4,4' }).addTo(mapLeaflet);
+        }
+      } else {
+        userLeafletMarker.setLatLng(latlng);
+        userLeafletCircle.setLatLng(latlng);
+        userLeafletCircle.setRadius(acc);
+      }
+    }
+
+    /* =====================================================================
+       SISTEMA DE LICENCIAMIENTO Y LÍMITE A 10 MEDICIONES DE PRUEBA
+       ===================================================================== */
+    const LOTE_STUDIO_SALT = "LOTESTUDIO_TOPOGRAFIA_SECRET_SALT_2026";
+    const LOTE_STUDIO_MASTER_KEY = "LOTESTUDIO-VIP-2026";
+    const MAX_DEMO_MEDICIONES = 10;
+    let loteActualYaContado = false;
+
+    function obtenerIdDispositivoLote() {
+      let id = localStorage.getItem('lotestudio_device_id');
+      if (!id) {
+        const hex = '0123456789ABCDEF';
+        let r1 = '', r2 = '';
+        for (let i = 0; i < 4; i++) r1 += hex[Math.floor(Math.random() * 16)];
+        for (let i = 0; i < 4; i++) r2 += hex[Math.floor(Math.random() * 16)];
+        id = `LS-${r1}-${r2}`;
+        localStorage.setItem('lotestudio_device_id', id);
+      }
+      return id;
+    }
+
+    function calcularClaveParaId(deviceId) {
+      const clean = deviceId.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      let hash = 0;
+      const combined = clean + LOTE_STUDIO_SALT;
+      for (let i = 0; i < combined.length; i++) {
+        const char = combined.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      const part1 = (Math.abs(hash) % 8999 + 1000).toString();
+
+      let hash2 = 0;
+      const combined2 = LOTE_STUDIO_SALT + clean + part1;
+      for (let i = 0; i < combined2.length; i++) {
+        const char = combined2.charCodeAt(i);
+        hash2 = ((hash2 << 5) - hash2) + char;
+        hash2 = hash2 & hash2;
+      }
+      const part2 = (Math.abs(hash2) % 8999 + 1000).toString();
+
+      let hash3 = 0;
+      const combined3 = part1 + clean + LOTE_STUDIO_SALT + part2;
+      for (let i = 0; i < combined3.length; i++) {
+        const char = combined3.charCodeAt(i);
+        hash3 = ((hash3 << 5) - hash3) + char;
+        hash3 = hash3 & hash3;
+      }
+      const part3 = (Math.abs(hash3) % 8999 + 1000).toString();
+
+      return `ACT-${part1}-${part2}-${part3}`;
+    }
+
+    function esLicenciaActivada() {
+      if (localStorage.getItem('lotestudio_is_activated') === 'true') {
+        const key = localStorage.getItem('lotestudio_license_key') || '';
+        const devId = obtenerIdDispositivoLote();
+        const expected = calcularClaveParaId(devId);
+        if (key.trim().toUpperCase() === expected || key.trim().toUpperCase() === LOTE_STUDIO_MASTER_KEY) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function obtenerNumeroMediciones() {
+      return parseInt(localStorage.getItem('lotestudio_measurements_count') || '0', 10);
+    }
+
+    function actualizarBadgeLicencia() {
+      const badge = document.getElementById('btnLicenseBadge');
+      const countEl = document.getElementById('demoCountDisplay');
+      if (!badge) return;
+
+      if (esLicenciaActivada()) {
+        badge.className = 'badge-license-pro';
+        badge.innerHTML = '🛡️ Licencia PRO Vitalicia';
+        badge.title = 'Tu sistema tiene mediciones y exportaciones ilimitadas';
+      } else {
+        const count = obtenerNumeroMediciones();
+        badge.className = 'badge-license-demo';
+        badge.innerHTML = `🎯 Demo: <span id="demoCountDisplay">${count}/${MAX_DEMO_MEDICIONES}</span>`;
+        badge.title = `Has realizado ${count} de ${MAX_DEMO_MEDICIONES} mediciones gratuitas de prueba. Toca para ver o activar.`;
+      }
+    }
+
+    function validarPermisoMedicion() {
+      if (esLicenciaActivada()) return true;
+      if (loteActualYaContado) return true;
+
+      const count = obtenerNumeroMediciones();
+      if (count >= MAX_DEMO_MEDICIONES) {
+        abrirModalActivacion(true);
+        return false;
+      }
+      return true;
+    }
+
+    function registrarMedicionSiAplica() {
+      if (esLicenciaActivada()) return;
+      if (loteActualYaContado) return;
+
+      let count = obtenerNumeroMediciones();
+      if (count >= MAX_DEMO_MEDICIONES) {
+        abrirModalActivacion(true);
+        return;
+      }
+
+      count++;
+      localStorage.setItem('lotestudio_measurements_count', count.toString());
+      loteActualYaContado = true;
+      actualizarBadgeLicencia();
+
+      if (count === MAX_DEMO_MEDICIONES) {
+        setTimeout(() => {
+          alert("⚠️ ATENCIÓN: Has completado tu 10ª medición de prueba gratuita en Lote Studio.\n\nHas alcanzado el límite de la versión demo. A partir de la medición #11, el sistema te solicitará tu código de activación permanente.");
+        }, 300);
+      }
+    }
+
+    function abrirModalActivacion(esBloqueo = false) {
+      const devId = obtenerIdDispositivoLote();
+      const devEl = document.getElementById('displayDeviceId');
+      if (devEl) devEl.textContent = devId;
+
+      const title = document.getElementById('modalActivacionTitle');
+      const banner = document.getElementById('demoNoticeBanner');
+      const text = document.getElementById('demoNoticeText');
+      const successNotice = document.getElementById('activationSuccessNotice');
+      if (successNotice) successNotice.style.display = 'none';
+
+      const count = obtenerNumeroMediciones();
+
+      if (esLicenciaActivada()) {
+        title.innerHTML = '<span>🛡️</span> Licencia PRO Vitalicia Activa';
+        title.style.color = '#10B981';
+        banner.style.background = 'rgba(16, 185, 129, 0.15)';
+        banner.style.borderColor = '#10B981';
+        banner.style.color = '#34D399';
+        text.innerHTML = '¡Tu sistema está 100% activado y desbloqueado de forma permanente con mediciones ilimitadas!';
+      } else if (esBloqueo || count >= MAX_DEMO_MEDICIONES) {
+        title.innerHTML = '<span>🔒</span> Límite de Demo Alcanzado (10/10)';
+        title.style.color = '#EF4444';
+        banner.style.background = 'rgba(239, 68, 68, 0.15)';
+        banner.style.borderColor = '#EF4444';
+        banner.style.color = '#FCA5A5';
+        text.innerHTML = `<strong>Has completado tus ${MAX_DEMO_MEDICIONES} mediciones gratuitas de prueba.</strong><br>Para realizar la medición #11 en adelante y continuar usando Lote Studio sin límites, ingresa tu clave de activación permanente.`;
+      } else {
+        title.innerHTML = '<span>🎯</span> Modo Demostración (10 Mediciones)';
+        title.style.color = '#F59E0B';
+        banner.style.background = 'rgba(245, 158, 11, 0.12)';
+        banner.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+        banner.style.color = '#FDE68A';
+        text.innerHTML = `Has utilizado <strong>${count} de ${MAX_DEMO_MEDICIONES} mediciones</strong> gratuitas de prueba. Al llegar a la 11ª medición el sistema requerirá tu código de activación.`;
+      }
+
+      document.getElementById('modalActivacion').classList.add('open');
+      setTimeout(() => document.getElementById('inputActivationKey')?.focus(), 200);
+    }
+
+    function activarLicenciaLoteStudio() {
+      const input = document.getElementById('inputActivationKey');
+      if (!input) return;
+      const key = input.value.trim().toUpperCase();
+      const devId = obtenerIdDispositivoLote();
+      const expected = calcularClaveParaId(devId);
+
+      if (key === expected || key === LOTE_STUDIO_MASTER_KEY) {
+        localStorage.setItem('lotestudio_is_activated', 'true');
+        localStorage.setItem('lotestudio_license_key', key);
+        actualizarBadgeLicencia();
+
+        const successNotice = document.getElementById('activationSuccessNotice');
+        if (successNotice) successNotice.style.display = 'block';
+
+        feedbackSonoro(true);
+        setTimeout(() => {
+          cerrarModal('modalActivacion');
+          alert("🎉 ¡FELICIDADES! Licencia permanente de Lote Studio activada con éxito.\n\nAhora tienes acceso ilimitado de por vida a mediciones GPS, cálculo de áreas, rumbos, curvas de nivel 3D y exportaciones CAD/PDF.");
+        }, 600);
+      } else {
+        alert("❌ Clave de activación incorrecta.\n\nVerifica que la clave coincida exactamente con tu ID de Instalación (" + devId + ") o solicítala al vendedor por WhatsApp.");
+      }
+    }
+
+    function copiarIdInstalacion() {
+      const devId = obtenerIdDispositivoLote();
+      navigator.clipboard.writeText(devId).then(() => {
+        alert("¡ID copiado al portapapeles!\n" + devId + "\nPuedes pegarlo en tu WhatsApp para enviarlo.");
+      }).catch(() => {
+        prompt("Copia tu ID de Instalación:", devId);
+      });
+    }
+
+    function solicitarLicenciaWhatsApp() {
+      const devId = obtenerIdDispositivoLote();
+      const msg = `¡Hola! 📐🌾 Estoy utilizando *Lote Studio (Topógrafo Pro)* en mi equipo.\n\n` +
+        `He utilizado mis 10 mediciones de prueba y deseo adquirir mi *Licencia Permanente e Ilimitada por $1,690 MXN*.\n\n` +
+        `Mi ID de Instalación es:\n` +
+        `🔑 *${devId}*\n\n` +
+        `¿Me podrían apoyar con los datos para realizar la compra y recibir mi clave de activación? ¡Muchas gracias!`;
+
+      const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+    }
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -772,6 +1253,7 @@
     </div>
 
     <div class="header-actions">
+      <button type="button" class="badge-license-demo" id="btnLicenseBadge" onclick="abrirModalActivacion(false)" title="Estado de la licencia">🎯 Demo: <span id="demoCountDisplay">0/10</span></button>
       <!-- Selector de Vista Rápida 3D / Satelital -->
       <button class="btn-chip" onclick="cambiarModoVistaPrincipal('3d')" title="Abrir Visor 3D CAD con rotación libre en los 3 ejes">
         🧊 Visor 3D (TIN)
@@ -878,6 +1360,12 @@
         </div>
 
         <div class="canvas-container" id="canvasWrapper">
+          <!-- HUD DE COORDENADAS GPS EN VIVO (DÓNDE ESTOY PARADO) -->
+          <div id="hudLiveGPS" style="position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:15; background:rgba(6,11,20,0.88); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid rgba(56,189,248,0.45); border-radius:30px; padding:6px 16px; font-family:monospace; font-size:0.78rem; font-weight:700; color:#38BDF8; display:flex; align-items:center; gap:8px; box-shadow:0 4px 20px rgba(0,0,0,0.5); pointer-events:none; white-space:nowrap;">
+            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10B981; box-shadow:0 0 8px #10B981;"></span>
+            <span id="hudLiveGPSText">📍 Conectando Satélites GPS...</span>
+          </div>
+
           <!-- Canvas 2D Arquitectónico -->
           <canvas id="planCanvas"></canvas>
 
@@ -1713,7 +2201,24 @@
           
           gpsState.innerText = "Señal GPS Activa";
           gpsDot.style.background = "var(--green)";
-          gpsCoords.innerText = `Lat: ${pos.coords.latitude.toFixed(6)} | Lon: ${pos.coords.longitude.toFixed(6)}`;
+
+          const latVal = pos.coords.latitude.toFixed(6);
+          const lonVal = pos.coords.longitude.toFixed(6);
+          const altVal = (pos.coords.altitude !== null && pos.coords.altitude !== undefined) ? `${pos.coords.altitude.toFixed(1)} m` : "Nivel Terreno";
+
+          gpsCoords.innerHTML = `<span style="color:#38BDF8; font-weight:800; font-family:monospace; font-size:0.95rem;">📍 Lat: ${latVal}° | Lon: ${lonVal}°</span><br><span style="font-size:0.75rem; color:var(--text-muted);">Alt: ${altVal} | Precisión: ±${acc.toFixed(1)}m</span>`;
+
+          const hudGPS = document.getElementById('hudLiveGPSText');
+          if (hudGPS) {
+            hudGPS.innerHTML = `📍 Lat: ${latVal}° | Lon: ${lonVal}° | Alt: ${altVal} | ±${acc.toFixed(1)}m`;
+          }
+
+          if (typeof mapLeaflet !== 'undefined' && mapLeaflet) {
+            actualizarPosicionSatelitalEnVivo(pos.coords.latitude, pos.coords.longitude, acc);
+          }
+
+          // Redibujar plano CAD para mover el cursor en vivo sobre el terreno
+          redibujar();
 
           accuracyVal.innerText = `± ${acc.toFixed(1)} m`;
 
@@ -1755,6 +2260,7 @@
     let verticePendienteGPS = null;
 
     function capturarVerticeGPS(silencioso = false) {
+      if (vertices.length === 0 && !validarPermisoMedicion()) return;
       if (!ultimaPosicion) {
         alert("Aún no se ha recibido señal de satélites GPS. Asegúrate de tener la ubicación activada y estar a cielo abierto.");
         return;
@@ -1853,6 +2359,7 @@
     }
 
     function capturarConPromedio() {
+      if (vertices.length === 0 && !validarPermisoMedicion()) return;
       if (!ultimaPosicion) {
         alert("Buscando señal GPS para iniciar promedio...");
         return;
@@ -1904,6 +2411,7 @@
       if (vertices.length === 0) return;
       if (confirm("¿Estás seguro de que deseas borrar todas las medidas del terreno y comenzar uno nuevo?")) {
         vertices = [];
+        loteActualYaContado = false;
         actualizarCalculos();
       }
     }
@@ -2041,6 +2549,9 @@
       let perimetroTotal = 0;
       const numPuntos = pts.length;
       const estaCerrado = numPuntos >= 3;
+      if (estaCerrado && !loteActualYaContado) {
+        registrarMedicionSiAplica();
+      }
 
       for (let i = 0; i < numPuntos; i++) {
         const esUltimoLado = (i === numPuntos - 1);
@@ -2657,6 +3168,11 @@
       // 7. DIBUJAR ESCALA GRÁFICA MÉTRICA
       if (capasVisibles.escala) {
         dibujarEscalaGrafica(30, h - 35, escalaFinal, colors);
+      }
+
+      // DIBUJAR POSICIÓN GPS EN VIVO DEL TOPÓGRAFO ("DÓNDE ESTOY PARADO")
+      if (ultimaPosicion) {
+        dibujarPosicionEnVivoGPS(w, h, pts, escalaFinal, centroX, centroY, toScreen, colors);
       }
     }
 
@@ -3587,6 +4103,7 @@ ${coordStr}
     }
 
     function abrirModalGuardarLote() {
+      if (!validarPermisoMedicion()) return;
       if (vertices.length === 0) {
         alert("Primero toma medidas o carga un terreno antes de guardarlo.");
         return;
@@ -3821,6 +4338,7 @@ ${coordStr}
     }
 
     function abrirModalExportar() {
+      if (!validarPermisoMedicion()) return;
       document.getElementById('modalExportar').classList.add('open');
     }
 
@@ -3833,6 +4351,7 @@ ${coordStr}
     }
 
     function guardarCoordenadaManual() {
+      if (vertices.length === 0 && !validarPermisoMedicion()) return;
       const latInput = parseFloat(document.getElementById('manLat').value);
       const lonInput = parseFloat(document.getElementById('manLon').value);
       const distInput = parseFloat(document.getElementById('manDist').value);
@@ -3876,6 +4395,7 @@ ${coordStr}
 
     /* Funciones del Asistente de Cinta Métrica & Diagonales */
     function abrirModalCintaMetrica() {
+      if (!validarPermisoMedicion()) return;
       actualizarAsistenteCinta();
       document.getElementById('modalCintaMetrica').classList.add('open');
     }
@@ -3895,6 +4415,7 @@ ${coordStr}
     }
 
     function aplicarTerrenoCinta() {
+      if (!validarPermisoMedicion()) return; // demo check
       const ancho = parseFloat(document.getElementById('cintaAncho').value) || 0;
       const largo = parseFloat(document.getElementById('cintaLargo').value) || 0;
 
@@ -3980,6 +4501,7 @@ ${coordStr}
     }
 
     function aplicarTerrenoIrregularCinta() {
+      if (!validarPermisoMedicion()) return; // demo check irregular
       if (!actualizarAsistenteIrregular()) {
         alert("Por favor verifica las medidas de los 4 lados y la diagonal. Deben formar triángulos cerrados válidos.");
         return;

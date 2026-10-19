@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual Técnico y Guía de Usuario - Topógrafo Pro GPS & Croquis CAD</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --cyan: #0ea5e9;
+      --dark: #0f172a;
+      --slate: #334155;
+      --muted: #64748b;
+      --bg-light: #f8fafc;
+      --border: #e2e8f0;
+      --gold: #d97706;
+      --green: #16a34a;
+      --purple: #7c3aed;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--slate);
+      background-color: #f1f5f9;
+      line-height: 1.6;
+      padding: 30px 15px;
+    }
+
+    .manual-container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 50px 60px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--border);
+    }
+
+    /* BOTÓN DE IMPRESIÓN / GUARDAR PDF */
+    .no-print {
+      position: sticky;
+      top: 15px;
+      z-index: 100;
+      margin-bottom: 25px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .btn-pdf {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-pdf:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+    }
+
+    /* PORTADA DEL MANUAL */
+    .header-cover {
+      border-bottom: 3px solid var(--primary);
+      padding-bottom: 30px;
+      margin-bottom: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .badge-doc {
+      display: inline-block;
+      background: rgba(2, 132, 199, 0.1);
+      color: var(--primary);
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2.2rem;
+      color: var(--dark);
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 1.05rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .doc-meta {
+      text-align: right;
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* SECCIONES Y ENCABEZADOS */
+    h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.35rem;
+      color: var(--dark);
+      margin: 35px 0 16px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      color: var(--dark);
+      margin: 20px 0 10px 0;
+    }
+
+    p {
+      margin-bottom: 14px;
+      font-size: 0.95rem;
+      color: #334155;
+    }
+
+    /* TARJETAS DE GLOSARIO Y TÉRMINOS */
+    .glossary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 20px 0;
+    }
+
+    @media (max-width: 700px) {
+      .glossary-grid {
+        grid-template-columns: 1fr;
+      }
+      .manual-container {
+        padding: 25px;
+      }
+    }
+
+    .term-card {
+      background: var(--bg-light);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      border-left: 4px solid var(--primary);
+    }
+
+    .term-card.gold { border-left-color: var(--gold); }
+    .term-card.green { border-left-color: var(--green); }
+    .term-card.purple { border-left-color: var(--purple); }
+
+    .term-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--dark);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .term-desc {
+      font-size: 0.85rem;
+      color: var(--slate);
+      line-height: 1.5;
+    }
+
+    /* CAJAS DE CONSEJOS PRÁCTICOS */
+    .tip-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .tip-icon {
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+
+    .tip-content {
+      font-size: 0.88rem;
+      color: #1e40af;
+    }
+
+    .tip-content b {
+      color: #1e3a8a;
+    }
+
+    /* PASOS NUMERADOS */
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin: 18px 0;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-text {
+      font-size: 0.92rem;
+      color: var(--slate);
+    }
+
+    .step-text b {
+      color: var(--dark);
+    }
+
+    /* TABLA RESUMEN */
+    table.manual-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.88rem;
+    }
+
+    table.manual-table th {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    table.manual-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: #334155;
+    }
+
+    table.manual-table tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    /* PIE DE PÁGINA */
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+      margin-top: 45px;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* ESTILOS ESPECÍFICOS PARA IMPRESIÓN Y PDF LIMPIO */
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .manual-container {
+        box-shadow: none;
+        border: none;
+        padding: 0;
+        max-width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
+      h2 {
+        page-break-after: avoid;
+      }
+      .term-card, .tip-box, table {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="manual-container">
+
+    <!-- BOTÓN DE IMPRESIÓN DIRECTA / PDF -->
+    <div class="no-print">
+      <button class="btn-pdf" onclick="window.print()">
+        <span>🖨️ Guardar en PDF / Imprimir</span>
+      </button>
+    </div>
+
+    <!-- PORTADA DEL MANUAL -->
+    <div class="header-cover">
+      <div>
+        <span class="badge-doc">Guía de Campo & Documento Técnico</span>
+        <h1>Topógrafo Pro GPS</h1>
+        <p class="subtitle">Manual Integral de Operación, Medición de Lotes y Glosario Topográfico</p>
+      </div>
+      <div class="doc-meta">
+        <b>VERSIÓN 2.5</b><br>
+        SISTEMA WGS84 & CAD<br>
+        USO INMOBILIARIO Y NOTARIAL
+      </div>
+    </div>
+
+    <!-- INTRODUCCIÓN -->
+    <h2>🎯 1. ¿Qué es este programa y para qué sirve?</h2>
+    <p>
+      <b>Topógrafo Pro GPS</b> es una aplicación profesional de ingeniería y arquitectura diseñada para medir terrenos, parcelas y lotes campestres o urbanos con alta precisión utilizando el sensor satelital del teléfono móvil y/o medidas exactas tomadas con cinta métrica.
+    </p>
+    <p>
+      El programa genera de forma automática planos arquitectónicos en 2D, modelos 3D interactivos con relieve del terreno, cálculo de metros cuadrados, rumbos topográficos, memoria descriptiva para escrituras públicas y presupuesto de bardeado y maquinaria.
+    </p>
+
+    <!-- GLOSARIO DE TECNICISMOS (EXPLICADOS FÁCIL) -->
+    <h2>📖 2. Glosario de Tecnicismos (Explicación Sencilla)</h2>
+    <p>
+      A continuación se definen los términos técnicos que utiliza la aplicación explicados en lenguaje común:
+    </p>
+
+    <div class="glossary-grid">
+      <div class="term-card">
+        <div class="term-title">📍 Vértice (V1, V2, V3...)</div>
+        <div class="term-desc">
+          Es cada una de las <b>esquinas o mojoneras</b> donde da vuelta el límite del terreno. Un terreno de 4 lados tiene 4 vértices.
+        </div>
+      </div>
+
+      <div class="term-card gold">
+        <div class="term-title">🧭 Rumbo Astronómico</div>
+        <div class="term-desc">
+          La orientación geográfica de una línea (Ej: <i>N 45° 12' E</i>). Significa hacia qué punto cardinal camina esa barda partiendo del Norte o Sur.
+        </div>
+      </div>
+
+      <div class="term-card green">
+        <div class="term-title">📐 Cotas / Cota Métricas</div>
+        <div class="term-desc">
+          Las <b>medidas escritas</b> sobre el plano. En 2D indican la distancia en metros entre esquinas; en altimetría indican la altura sobre el nivel de referencia (<i>N+1.40m</i>).
+        </div>
+      </div>
+
+      <div class="term-card purple">
+        <div class="term-title">📜 Colindancias</div>
+        <div class="term-desc">
+          Indica <b>con quién o con qué limita</b> cada lado del terreno (Ej: <i>Al Norte con Calle Juárez, al Oriente con Propiedad de Juan Pérez</i>). Requisito indispensable en Notarías.
+        </div>
+      </div>
+
+      <div class="term-card">
+        <div class="term-title">⛰️ Cota y Desnivel</div>
+        <div class="term-desc">
+          <b>Cota:</b> Altura en metros de un punto. <br>
+          <b>Desnivel:</b> La diferencia de altura entre la parte más baja y la más alta de tu predio.
+        </div>
+      </div>
+
+      <div class="term-card gold">
+        <div class="term-title">🚜 Promontorio / "Chipote"</div>
+        <div class="term-desc">
+          Cualquier <b>montículo de tierra o loma natural</b> que sobresale sobre el terreno y que debe ser rebajado con bulldozer para nivelar el lote para construir.
+        </div>
+      </div>
+
+      <div class="term-card green">
+        <div class="term-title">🧊 Malla TIN Wireframe (3D)</div>
+        <div class="term-desc">
+          (<i>Triangulated Irregular Network</i>) Es el modelo tridimensional formado por triángulos celestes que representa con exactitud cómo se levanta y cae la tierra en tu predio.
+        </div>
+      </div>
+
+      <div class="term-card purple">
+        <div class="term-title">📄 Memoria Descriptiva</div>
+        <div class="term-desc">
+          El texto técnico legal redactado formalmente que describe el recorrido perimetral del lote, exigido por notarios, bancos y oficinas de catastro municipal.
+        </div>
+      </div>
+    </div>
+
+    <!-- CÓMO MEDIR EN CAMPO PASO A PASO -->
+    <h2>🚶‍♂️ 3. Guía Paso a Paso: ¿Cómo Medir un Terreno en Campo?</h2>
+
+    <div class="steps-list">
+      <div class="step-item">
+        <div class="step-number">1</div>
+        <div class="step-text">
+          <b>Llega a la primera esquina (Vértice 1):</b><br>
+          Párate en la mojonera inicial de tu terreno. Espera a que la app muestre en la tarjeta superior <b>Precisión: &lt; 4.0 m</b>. Pulsa el botón azul <b>📍 Guardar Vértice GPS</b> (o el botón <b>📐 Promediar</b> para mayor precisión).
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">2</div>
+        <div class="step-text">
+          <b>Camina por el perímetro hacia la segunda esquina (Vértice 2):</b><br>
+          Al llegar, pulsa nuevamente <b>Guardar Vértice GPS</b>. La app te preguntará si deseas usar la medida exacta de tu cinta métrica o dejar la distancia satelital.
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">3</div>
+        <div class="step-text">
+          <b>Repite en todas las esquinas hasta dar la vuelta completa:</b><br>
+          Al marcar el último vértice, el plano se cerrará automáticamente, calculando los metros cuadrados ($m^2$), hectáreas, perímetro y todos los rumbos.
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">4</div>
+        <div class="step-text">
+          <b>Registra los datos del relieve o montículo:</b><br>
+          En la pestaña <b>⛰️ Bulldozer</b>, ingresa la altura de la loma y su diámetro base. La app calculará cuántos $m^3$ de tierra hay que cortar y cuántos camiones de volteo se requieren.
+        </div>
+      </div>
+    </div>
+
+    <div class="tip-box">
+      <div class="tip-icon">💡</div>
+      <div class="tip-content">
+        <b>Consejo de Oro para Terrenos Pequeños (5x5, 10x20):</b><br>
+        Bajo el sol o en lotes urbanos estrechos, usa el botón superior <b>📏 Medir con Cinta</b>. Ingresa el ancho y largo; la app aplicará el Teorema de Pitágoras para darte la <i>diagonal de comprobación</i> que garantiza que las esquinas queden a <b>90° en escuadra perfecta</b>.
+      </div>
+    </div>
+
+    <!-- EXPLICACIÓN DE LAS 3 VISTAS -->
+    <h2>👁️ 4. Las Vistas Principales de la Aplicación</h2>
+
+    <table class="manual-table">
+      <thead>
+        <tr>
+          <th>Vista</th>
+          <th>Función Principal</th>
+          <th>Uso Recomendado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>📐 Plano 2D (CAD)</b></td>
+          <td>Plano técnico con membrete, cotas, ángulos y rosa de los vientos.</td>
+          <td>Para imprimir, presentar a clientes o tramitar licencias de construcción.</td>
+        </tr>
+        <tr>
+          <td><b>🛰️ Vista Satelital HD</b></td>
+          <td>Proyecta el polígono sobre fotografías satelitales reales de alta resolución.</td>
+          <td>Para comprobar linderos con vecinos, caminos de acceso y ubicación global.</td>
+        </tr>
+        <tr>
+          <td><b>🧊 Visor 3D (TIN)</b></td>
+          <td>Malla tridimensional interactiva que se rota libremente en 3 ejes ($X,Y,Z$).</td>
+          <td>Para ver la inclinación de la pendiente, la loma/chipote y cotas flotantes.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- GUARDADO Y EXPORTACIÓN -->
+    <h2>💾 5. Guardar Proyectos y Formatos de Exportación</h2>
+    <p>
+      El sistema cuenta con almacenamiento permanente en la memoria del dispositivo y múltiples opciones para compartir:
+    </p>
+
+    <div class="steps-list">
+      <div class="step-item">
+        <div class="step-number">💾</div>
+        <div class="step-text">
+          <b>Botón "Guardar Lote":</b> Almacena el predio en tu teléfono con nombre (*Ej: "Lote 7 San Ángel"*). No se borra al cerrar el navegador.
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-number">📁</div>
+        <div class="step-text">
+          <b>Botón "Mis Terrenos":</b> Tu biblioteca de proyectos. Permite abrir cualquier terreno guardado o compartir el archivo <b>.TOPOMAP</b> por WhatsApp o correo.
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-number">📥</div>
+        <div class="step-text">
+          <b>Formatos de Exportación Disponibles:</b>
+          <ul style="margin-left:20px; margin-top:6px; font-size:0.85rem;">
+            <li><b>🖼️ Imagen PNG HD:</b> Plano en resolución 2400x1600 listo para enviar por mensaje o imprimir.</li>
+            <li><b>🖨️ PDF:</b> Documento en formato horizontal listo para anexar a expedientes.</li>
+            <li><b>📐 DXF (AutoCAD):</b> Vectores compatibles con AutoCAD, SketchUp y Civil 3D.</li>
+            <li><b>🌍 KML (Google Earth):</b> Para visualizar el terreno en 3D sobre la app de Google Earth.</li>
+            <li><b>📄 Dictamen / Informe Técnico (TXT):</b> Documento completo con coordenadas, altimetría, cotas, cálculo de camiones y memoria notarial.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <b>Topógrafo Pro GPS & Croquis Arquitectónico</b> &copy; 2026 — Sistema de Levantamiento Topográfico y Generador de Planos.
+    </footer>
+
+  </div>
+
+</body>
+</html>
